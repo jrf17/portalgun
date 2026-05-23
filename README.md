@@ -18,6 +18,18 @@ sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/
 
 That installs it, registers it in `installers/install_github_tools.sh` (so the next clean rebuild includes it), updates the web UI, and symlinks the binary to `/usr/local/bin/` (Linux targets only).
 
+## Web UI
+
+Once `./install.sh` finishes, the tools-docs web server is live on port **1337**:
+
+| URL | What it shows |
+|---|---|
+| `http://<vm-ip>:1337` | Main tools dashboard (Kali tools docs + config manager) |
+| `http://<vm-ip>:1337/portalgun_tools.html` | Live list of everything portalgun has installed (apt + github, filterable, searchable) |
+| `http://<vm-ip>:1337/portalgun_wiki.html` | Full portalgun docs — commands, paths, status codes, **default service credentials** (BloodHound, postgres, neo4j) |
+
+The main index has a purple banner at the top with one-click links to the portalgun pages. From any host on the same network: open the IP, click around.
+
 ## Quick reference
 
 ```bash
