@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>portalgun · wiki</title>
+  <style>
+    :root {
+      --bg: #1e1e2e; --fg: #cdd6f4; --gray: #313244; --gray-2: #45475a;
+      --blue: #89b4fa; --green: #a6e3a1; --yellow: #f9e2af; --red: #f38ba8;
+      --magenta: #cba6f7; --cyan: #89dceb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--fg);
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+      font-size: 15px; line-height: 1.6;
+    }
+    .wrapper { max-width: 920px; margin: 0 auto; padding: 32px 40px 80px; }
+    h1 { color: var(--magenta); font-size: 32px; margin: 0 0 4px; }
+    .tagline { color: var(--gray-2); margin: 0 0 32px; font-style: italic; }
+    h2 {
+      color: var(--cyan); font-size: 22px; margin-top: 40px;
+      padding-bottom: 6px; border-bottom: 1px solid var(--gray);
+    }
+    h3 { color: var(--blue); font-size: 17px; margin-top: 24px; }
+    a { color: var(--blue); }
+    code, pre {
+      font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+    }
+    code { background: var(--gray); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    pre {
+      background: var(--gray); padding: 14px 16px; border-radius: 6px;
+      overflow-x: auto; font-size: 13px; line-height: 1.5;
+      border-left: 3px solid var(--blue);
+    }
+    pre code { background: none; padding: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td {
+      text-align: left; padding: 8px 12px;
+      border-bottom: 1px solid var(--gray);
+      vertical-align: top;
+    }
+    th { color: var(--gray-2); font-weight: 600; font-size: 13px; text-transform: uppercase; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-family: monospace; text-transform: uppercase;
+    }
+    .badge.ok       { background: rgba(166, 227, 161, 0.2); color: var(--green); }
+    .badge.warning  { background: rgba(249, 226, 175, 0.2); color: var(--yellow); }
+    .badge.danger   { background: rgba(243, 139, 168, 0.2); color: var(--red); }
+    .badge.info     { background: rgba(137, 220, 235, 0.2); color: var(--cyan); }
+    blockquote {
+      margin: 16px 0; padding: 12px 16px;
+      border-left: 4px solid var(--yellow);
+      background: rgba(249, 226, 175, 0.06);
+      color: var(--fg);
+    }
+    blockquote.danger { border-color: var(--red); background: rgba(243, 139, 168, 0.06); }
+    .nav { background: var(--gray); padding: 16px 20px; border-radius: 6px; margin-bottom: 24px; }
+    .nav ul { margin: 0; padding-left: 20px; columns: 2; }
+    .nav a { color: var(--cyan); text-decoration: none; }
+    .nav a:hover { text-decoration: underline; }
+    .kbd {
+      display: inline-block; padding: 1px 6px; font-family: monospace; font-size: 11px;
+      background: var(--gray-2); border-radius: 3px; border: 1px solid #555;
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+<h1>portalgun</h1>
+<p class="tagline">Install tools and have them register themselves everywhere they need to be.</p>
+
+<div class="nav">
+<strong>Contents</strong>
+<ul>
+  <li><a href="#what">What portalgun does</a></li>
+  <li><a href="#install">Installing portalgun</a></li>
+  <li><a href="#commands">Commands</a></li>
+  <li><a href="#install-apt">install apt</a></li>
+  <li><a href="#install-github">install github</a></li>
+  <li><a href="#detect">Auto-compile detection</a></li>
+  <li><a href="#status">Tool status codes</a></li>
+  <li><a href="#paths">Paths reference</a></li>
+  <li><a href="#doctor">doctor</a></li>
+  <li><a href="#sanitize">sanitize</a></li>
+  <li><a href="#firstboot">First-boot service</a></li>
+  <li><a href="#services">Services &amp; default access</a></li>
+  <li><a href="#vm-clone">VM cloning workflow</a></li>
+  <li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</div>
+
+<h2 id="what">What portalgun does</h2>
+
+<p>Every <code>portalgun install</code> performs five actions in one shot:</p>
+<ol>
+  <li><strong>Installs the tool</strong> (apt-get install, or git clone + auto-detect compile)</li>
+  <li><strong>Records it in the registry</strong> at <code>/var/lib/portalgun/registry/&lt;type&gt;/&lt;name&gt;.json</code></li>
+  <li><strong>Appends it to the v1 install scripts</strong> (<code>Kali_Config/installable_packages.txt</code> or <code>Kali_Config/install_github_tools.sh</code>) inside <code>PORTALGUN_MANAGED_START</code>/<code>END</code> markers, so clean rebuilds include it</li>
+  <li><strong>Updates the web manifest</strong> at <code>/opt/tools-docs/portalgun_tools.json</code> so the tools dashboard shows it</li>
+  <li><strong>Symlinks the binary to <code>/usr/local/bin/</code></strong> so it&rsquo;s callable by name from any shell (Linux targets only; never shadows system commands)</li>
+</ol>
+
+<p>The pattern: <em>installing teaches the system</em>. Run <code>portalgun install&hellip;</code> once on the master image and every future build/clone has the tool.</p>
+
+<h2 id="install">Installing portalgun</h2>
+
+<pre>cd ~/portalgun
+sudo ./install.sh</pre>
+
+<p>This:</p>
+<ul>
+  <li>Copies portalgun to <code>/opt/portalgun/</code></li>
+  <li>Symlinks <code>/usr/local/bin/portalgun</code></li>
+  <li>Creates <code>/var/lib/portalgun/registry/{apt,github}/</code> and <code>/var/log/portalgun/</code></li>
+  <li>Installs zsh completion to <code>/usr/share/zsh/site-functions/_portalgun</code></li>
+  <li>Drops <code>portalgun_tools.html</code> and <code>portalgun_wiki.html</code> into <code>/opt/tools-docs/</code></li>
+  <li>Enables <code>portalgun-firstboot.service</code> (runs once on first boot of clones)</li>
+  <li>Adds a banner link to the main tools-docs index.html</li>
+</ul>
+
+<h2 id="commands">Commands</h2>
+
+<table>
+<thead><tr><th>Command</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>portalgun help</code></td><td>Show usage</td></tr>
+<tr><td><code>portalgun status</code></td><td>Show registry totals + paths</td></tr>
+<tr><td><code>portalgun list [apt|github|all]</code></td><td>List installed tools by type</td></tr>
+<tr><td><code>portalgun doctor [--fix-shadows]</code></td><td>Full diagnostic (registry, symlinks, services)</td></tr>
+<tr><td><code>sudo portalgun install apt &lt;package&gt;</code></td><td>apt install + register</td></tr>
+<tr><td><code>sudo portalgun install github &lt;url&gt; [target-dir]</code></td><td>git clone + auto-detect compile + register</td></tr>
+<tr><td><code>sudo portalgun sanitize [--yes]</code></td><td>Prep VM for cloning (DESTRUCTIVE)</td></tr>
+</tbody>
+</table>
+
+<h2 id="install-apt">install apt</h2>
+
+<pre>sudo portalgun install apt nmap</pre>
+
+<p>Result: <code>nmap</code> is installed, registered to <code>/var/lib/portalgun/registry/apt/nmap.json</code>, appended to <code>~/Kali_Config/installable_packages.txt</code> (inside the managed block), and shown on the tools dashboard.</p>
+
+<p>If the package is already installed, portalgun skips the install but still registers it.</p>
+
+<h2 id="install-github">install github</h2>
+
+<pre>sudo portalgun install github &lt;github-url&gt; [target-dir]</pre>
+
+<h3>Examples</h3>
+
+<pre>sudo portalgun install github \
+    https://github.com/akamai/BadSuccessor \
+    /opt/tools/windows/exploit
+
+sudo portalgun install github \
+    https://github.com/tomnomnom/httprobe \
+    /opt/tools/linux/recon</pre>
+
+<p>If the target-dir is omitted, portalgun defaults to <code>/opt/tools/misc</code>. Use tab completion: <code>portalgun install github &lt;url&gt; /opt/tools/&lt;TAB&gt;</code>.</p>
+
+<p>The target directory category drives behavior:</p>
+<ul>
+  <li><code>/opt/tools/windows/&hellip;</code> — assumed to be Windows tools you transfer to targets; compile is skipped, no PATH symlink created</li>
+  <li><code>/opt/tools/linux/&hellip;</code>, <code>/opt/tools/enumeration/&hellip;</code>, others — compile if a build system is detected, PATH symlink created if executable lands at tool root</li>
+</ul>
+
+<h2 id="detect">Auto-compile detection</h2>
+
+<p>For <code>install github</code>, after cloning, portalgun inspects the repo root for these markers in priority order:</p>
+
+<table>
+<thead><tr><th>File present</th><th>Language</th><th>Build command</th></tr></thead>
+<tbody>
+<tr><td><code>Cargo.toml</code></td><td>Rust</td><td><code>cargo build --release</code></td></tr>
+<tr><td><code>go.mod</code></td><td>Go</td><td><code>go build -o &lt;name&gt; ./&hellip;</code></td></tr>
+<tr><td><code>pom.xml</code></td><td>Maven</td><td><code>mvn -q package -DskipTests</code></td></tr>
+<tr><td><code>build.gradle*</code></td><td>Gradle</td><td><code>gradle -q build -x test</code></td></tr>
+<tr><td><code>CMakeLists.txt</code></td><td>CMake</td><td><code>cmake -B build &amp;&amp; cmake --build build</code></td></tr>
+<tr><td><code>configure</code> (executable)</td><td>Autotools</td><td><code>./configure &amp;&amp; make</code></td></tr>
+<tr><td><code>Makefile</code></td><td>catch-all</td><td><code>make</code></td></tr>
+<tr><td><code>pyproject.toml</code> / <code>setup.py</code></td><td>Python</td><td><code>pip install --user .</code></td></tr>
+<tr><td><code>*.csproj</code> / <code>*.sln</code></td><td>.NET</td><td><code>dotnet build -c Release</code></td></tr>
+<tr><td><code>package.json</code> with <code>scripts.build</code></td><td>Node</td><td><code>npm ci &amp;&amp; npm run build</code></td></tr>
+<tr><td><em>none of the above</em></td><td>scripts only</td><td>no build, just <code>chmod +x</code></td></tr>
+</tbody>
+</table>
+
+<p>Missing toolchains are auto-installed once before building (<code>apt install cargo</code>, <code>apt install golang</code>, etc.).</p>
+
+<blockquote>
+<strong>Target-dir override:</strong> if the target-dir contains <code>/windows/</code>, compile is skipped even when a build system is detected. Windows tools usually ship pre-compiled <code>.exe</code>s.
+</blockquote>
+
+<h2 id="status">Tool status codes</h2>
+
+<table>
+<thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><span class="badge ok">ok</span></td><td>Installed and (if compiled) built successfully</td></tr>
+<tr><td><span class="badge info">source_only</span></td><td>Clone succeeded but no build was attempted or needed</td></tr>
+<tr><td><span class="badge warning">build_failed</span></td><td>Clone OK, build attempted, build failed — see <code>/var/log/portalgun/build-&lt;tool&gt;.log</code></td></tr>
+<tr><td><span class="badge info">skipped</span></td><td>Clone OK, build skipped (windows target)</td></tr>
+</tbody>
+</table>
+
+<p>Build failures never block registration. The tool is still cloned and discoverable; you can <code>portalgun install github &lt;url&gt;</code> again after fixing build deps.</p>
+
+<h2 id="paths">Paths reference</h2>
+
+<table>
+<thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>/opt/portalgun/</code></td><td>The tool itself (bin, lib, web, completion)</td></tr>
+<tr><td><code>/usr/local/bin/portalgun</code></td><td>Symlink for <code>$PATH</code></td></tr>
+<tr><td><code>/var/lib/portalgun/registry/{apt,github}/*.json</code></td><td>Per-tool manifest entries</td></tr>
+<tr><td><code>/var/log/portalgun/</code></td><td><code>apt.log</code>, <code>git.log</code>, <code>build-&lt;tool&gt;.log</code></td></tr>
+<tr><td><code>/opt/tools-docs/portalgun_tools.html</code></td><td>Live tools dashboard (this site)</td></tr>
+<tr><td><code>/opt/tools-docs/portalgun_tools.json</code></td><td>Tool manifest the dashboard reads</td></tr>
+<tr><td><code>/opt/tools-docs/portalgun_wiki.html</code></td><td>This wiki</td></tr>
+<tr><td><code>~/Kali_Config/installable_packages.txt</code></td><td>v1 apt script (auto-modified by <code>install apt</code>)</td></tr>
+<tr><td><code>~/Kali_Config/install_github_tools.sh</code></td><td>v1 github script (auto-modified by <code>install github</code>)</td></tr>
+</tbody>
+</table>
+
+<p>All paths overridable via env vars: <code>PORTALGUN_ROOT</code>, <code>PORTALGUN_REGISTRY</code>, <code>PORTALGUN_LOG_DIR</code>, <code>PORTALGUN_TOOLS_BASE</code>, <code>PORTALGUN_WEB_DIR</code>, <code>PORTALGUN_V1_DIR</code> &mdash; see <code>portalgun help</code>.</p>
+
+<h2 id="doctor">doctor</h2>
+
+<pre>portalgun doctor</pre>
+
+<p>Read-only diagnostic. Reports:</p>
+<ul>
+  <li>Registry totals (apt/github counts, build_failed list)</li>
+  <li><code>/opt/tools/</code> audit: complete vs source-only vs empty</li>
+  <li>Total <code>/usr/local/bin → /opt/tools</code> symlinks, including broken ones</li>
+  <li><strong>Symlinks that shadow system commands</strong> (warning — these are dangerous)</li>
+  <li>Service status: <code>tools-server</code>, <code>portalgun-firstboot</code>, <code>bloodhound</code></li>
+  <li>Web manifest drift vs registry</li>
+</ul>
+
+<p>To remove dangerous shadows:</p>
+
+<pre>sudo portalgun doctor --fix-shadows</pre>
+
+<h2 id="sanitize">sanitize</h2>
+
+<blockquote class="danger">
+<strong>DESTRUCTIVE.</strong> Run only on a master image right before shutdown. Confirms with <kbd>y</kbd> unless <code>--yes</code> is passed.
+</blockquote>
+
+<pre>sudo portalgun sanitize</pre>
+
+<p>What it does:</p>
+<ol>
+  <li>Stop BloodHound containers cleanly</li>
+  <li>Clear bash/zsh history (root + all <code>/home/*</code> users)</li>
+  <li>Truncate <code>/var/log/*</code> + rotate journal</li>
+  <li><code>apt-get clean</code></li>
+  <li>Remove <code>/etc/sudoers.d/temp_install</code> if <code>master_setup.sh</code> left it</li>
+  <li>Clear DHCP leases + NetworkManager state</li>
+  <li>Clear <code>/tmp</code> and <code>/var/tmp</code></li>
+  <li><code>fstrim -av</code> + zero free space (qcow2 compresses small)</li>
+</ol>
+
+<p><strong>What sanitize does NOT remove:</strong></p>
+<ul>
+  <li>BloodHound admin password (lives in the postgres volume) &mdash; ships in clone</li>
+  <li>Firefox saved passwords + bookmarks (live in the profile) &mdash; ships in clone</li>
+  <li>portalgun registry, <code>/opt/tools/</code></li>
+</ul>
+
+<p>These are usually what you want in the master. If not, edit them out before sanitize.</p>
+
+<h2 id="firstboot">First-boot service</h2>
+
+<p><code>portalgun-firstboot.service</code> runs once on the <strong>first boot of each clone</strong> and:</p>
+<ul>
+  <li>Regenerates <code>/etc/machine-id</code> (systemd, dbus, DHCP client ID)</li>
+  <li>Regenerates SSH host keys (<code>/etc/ssh/ssh_host_*</code>)</li>
+  <li>Clears any leftover shell history</li>
+  <li>Removes <code>/var/lib/systemd/random-seed</code></li>
+  <li>Touches <code>/var/lib/portalgun/firstboot-done</code> and disables itself</li>
+</ul>
+
+<p>This prevents two clones on the same network from fighting over identical machine-id or SSH fingerprints.</p>
+
+<h2 id="services">Services &amp; default access</h2>
+
+<p>What the master image exposes after a fresh <code>./install.sh</code>:</p>
+
+<table>
+<thead><tr><th>Service</th><th>URL</th><th>Username</th><th>Password</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Tools dashboard</strong> (portalgun)</td>
+  <td><code>http://&lt;vm-ip&gt;:1337</code></td>
+  <td>—</td>
+  <td>(no auth)</td>
+</tr>
+<tr>
+  <td><strong>BloodHound CE</strong></td>
+  <td><code>http://&lt;vm-ip&gt;:1338</code></td>
+  <td><code>admin</code></td>
+  <td><code>Bloodhound123!!</code></td>
+</tr>
+<tr>
+  <td><strong>BloodHound app DB</strong> (postgres)</td>
+  <td><code>app-db:5432</code> (container-internal only)</td>
+  <td><code>bloodhound</code></td>
+  <td><code>bloodhoundcommunityedition</code></td>
+</tr>
+<tr>
+  <td><strong>BloodHound graph DB</strong> (neo4j)</td>
+  <td><code>graph-db:7687</code> (container-internal only)</td>
+  <td><code>neo4j</code></td>
+  <td><code>bloodhoundcommunityedition</code></td>
+</tr>
+</tbody>
+</table>
+
+<blockquote class="danger">
+The BloodHound admin password is baked into the master image (lives in the postgres seed volume). Every clone of this VM gets the same admin password until someone changes it via the UI. If you change it on a clone, it stays changed only on that clone; the next deploy of the master image will still have <code>Bloodhound123!!</code>.
+<br><br>
+To rotate the password in the master: log in to the UI, change it, then <code>sudo portalgun sanitize</code> doesn&rsquo;t clear it (postgres volume is preserved). To <em>re-seed</em> the bloodhound volumes for distribution, re-snapshot them after changing the password — see the BloodHound section of the main README for the snapshot commands.
+</blockquote>
+
+<h3>Manage BloodHound from the shell</h3>
+
+<pre>sudo bloodhound-ce start          # bring up all 3 containers
+sudo bloodhound-ce stop           # stop all containers
+sudo bloodhound-ce status         # docker compose ps
+sudo bloodhound-ce logs           # follow bloodhound logs
+sudo bloodhound-ce resetpwd       # reset admin password (interactive)</pre>
+
+<h2 id="vm-clone">VM cloning workflow</h2>
+
+<pre># On the master VM, after the image is fully built:
+sudo portalgun doctor              # verify everything is healthy
+sudo portalgun sanitize            # confirm with y
+sudo shutdown -h now
+
+# On the hypervisor host:
+sudo qemu-img convert -O qcow2 -c \
+    /var/lib/libvirt/images/master.qcow2 \
+    ~/share/kali-$(date +%Y-%m-%d).qcow2
+
+# Distribute. Recipients boot the qcow2 &mdash; portalgun-firstboot
+# regenerates identity automatically on first boot.</pre>
+
+<blockquote>
+<strong>Security:</strong> the seed tarballs contain real credentials (Firefox saved logins, BloodHound admin password hash). Do not redistribute the master VM externally without first replacing or removing these.
+</blockquote>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<h3>Tool not on PATH after install</h3>
+<ol>
+  <li>Was it installed to a <code>/opt/tools/windows/&hellip;</code> path? Windows targets are intentionally skipped (PE binaries don&rsquo;t run on Linux).</li>
+  <li>Does a system command with the same name exist? portalgun never shadows <code>/usr/bin/</code>, <code>/bin/</code>, <code>/usr/sbin/</code>, <code>/sbin/</code>.</li>
+  <li>Run <code>portalgun doctor</code> &mdash; it reports total symlinks and broken ones.</li>
+</ol>
+
+<h3>Build failed for a github tool</h3>
+<p>Check <code>/var/log/portalgun/build-&lt;toolname&gt;.log</code> for the actual error. Common causes:</p>
+<ul>
+  <li>Missing build deps that auto-install didn&rsquo;t catch (try <code>apt install build-essential</code>)</li>
+  <li>Rust crates that don&rsquo;t compile with current rustc &mdash; drop <code>--locked</code> from compile_cmd</li>
+  <li>Old <code>Gopkg.lock</code> projects &mdash; modern Go won&rsquo;t build them; they need <code>go mod init</code> conversion</li>
+</ul>
+
+<h3>"Dangerous shadow" detected by doctor</h3>
+<p>A repo created a script named <code>find</code> / <code>grep</code> / etc. that got symlinked. Run:</p>
+<pre>sudo portalgun doctor --fix-shadows</pre>
+
+<h3>GitHub API rate limit during install</h3>
+<p>portalgun uses three tiers: hardcoded URL → API → release-page scrape. Tier 3 doesn&rsquo;t hit the API, so installs work even when rate-limited. If you see "API rate limit exceeded," portalgun automatically falls through.</p>
+
+<h3>Registry vs web manifest drift</h3>
+<p><code>portalgun doctor</code> warns if these disagree. Run any <code>portalgun install</code> to refresh the manifest, or manually: <code>sudo python3 /opt/portalgun/lib/sync_web.py /var/lib/portalgun/registry /opt/tools-docs/portalgun_tools.json</code></p>
+
+</div>
+</body>
+</html>

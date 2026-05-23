@@ -1,0 +1,119 @@
+#!/bin/bash
+# portalgun — install tools and register them in scripts + web UI
+set -e
+
+# ─── Configuration (overridable via env) ────────────────────────────
+PORTALGUN_ROOT="${PORTALGUN_ROOT:-/opt/portalgun}"
+PORTALGUN_LIB="${PORTALGUN_LIB:-$PORTALGUN_ROOT/lib}"
+PORTALGUN_REGISTRY="${PORTALGUN_REGISTRY:-/var/lib/portalgun/registry}"
+PORTALGUN_LOG_DIR="${PORTALGUN_LOG_DIR:-/var/log/portalgun}"
+PORTALGUN_TOOLS_BASE="${PORTALGUN_TOOLS_BASE:-/opt/tools}"
+PORTALGUN_WEB_DIR="${PORTALGUN_WEB_DIR:-/opt/tools-docs}"
+# Source repo dir — where the merged portalgun repo lives (with installers/ and data/).
+# Auto-detect: try /home/$USER/portalgun, SUDO_USER home, /root/portalgun.
+if [ -z "$PORTALGUN_REPO_DIR" ]; then
+    for candidate in "/home/${SUDO_USER:-$USER}/portalgun" "$HOME/portalgun" "/root/portalgun"; do
+        if [ -d "$candidate/installers" ] && [ -d "$candidate/data" ]; then
+            PORTALGUN_REPO_DIR="$candidate"
+            break
+        fi
+    done
+    PORTALGUN_REPO_DIR="${PORTALGUN_REPO_DIR:-/home/kali/portalgun}"
+fi
+export PORTALGUN_ROOT PORTALGUN_LIB PORTALGUN_REGISTRY PORTALGUN_LOG_DIR \
+       PORTALGUN_TOOLS_BASE PORTALGUN_WEB_DIR PORTALGUN_REPO_DIR
+
+# ─── Load common lib ─────────────────────────────────────────────────
+if [ ! -f "$PORTALGUN_LIB/common.sh" ]; then
+    echo "portalgun: lib not found at $PORTALGUN_LIB" >&2
+    echo "Did you run install.sh?" >&2
+    exit 1
+fi
+source "$PORTALGUN_LIB/common.sh"
+source "$PORTALGUN_LIB/registry.sh"
+source "$PORTALGUN_LIB/detect.sh"
+
+# ─── Usage ───────────────────────────────────────────────────────────
+usage() {
+    cat <<'EOF'
+portalgun — install tools and register them in scripts + web UI
+
+USAGE
+    portalgun install apt <package>
+    portalgun install github <url> [target-dir]
+    portalgun list [apt|github|all]
+    portalgun status
+    portalgun doctor [--fix-shadows]
+    portalgun sanitize [--yes]
+    portalgun help
+
+EXAMPLES
+    sudo portalgun install apt nmap
+    sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/windows/exploit
+    portalgun list github
+    portalgun doctor                  # diagnose registry + symlinks + services
+    sudo portalgun sanitize           # prep VM for cloning (DESTRUCTIVE)
+
+EVERY install ALSO:
+    1. Records the tool in the registry (/var/lib/portalgun/registry/)
+    2. Appends it to the v1 install scripts so reinstalls include it
+    3. Updates the web UI's tool listing (portalgun_tools.json)
+
+ENVIRONMENT (defaults shown)
+    PORTALGUN_ROOT=/opt/portalgun
+    PORTALGUN_REGISTRY=/var/lib/portalgun/registry
+    PORTALGUN_LOG_DIR=/var/log/portalgun
+    PORTALGUN_TOOLS_BASE=/opt/tools
+    PORTALGUN_WEB_DIR=/opt/tools-docs
+    PORTALGUN_REPO_DIR=auto-detected (~/portalgun)
+EOF
+}
+
+# ─── Dispatch ────────────────────────────────────────────────────────
+cmd="${1:-help}"; shift || true
+
+case "$cmd" in
+    install)
+        type="${1:-}"
+        case "$type" in
+            apt)
+                shift
+                source "$PORTALGUN_LIB/install_apt.sh"
+                install_apt "$@"
+                ;;
+            github)
+                shift
+                source "$PORTALGUN_LIB/install_github.sh"
+                install_github "$@"
+                ;;
+            ""|-h|--help)
+                usage; exit 0
+                ;;
+            *)
+                print_error "Unknown install type: $type"
+                usage
+                exit 1
+                ;;
+        esac
+        ;;
+    list)
+        registry_list "${1:-all}"
+        ;;
+    status)
+        registry_status
+        ;;
+    doctor)
+        source "$PORTALGUN_LIB/doctor.sh" "$@"
+        ;;
+    sanitize)
+        source "$PORTALGUN_LIB/sanitize.sh" "$@"
+        ;;
+    help|--help|-h|"")
+        usage
+        ;;
+    *)
+        print_error "Unknown command: $cmd"
+        usage
+        exit 1
+        ;;
+esac

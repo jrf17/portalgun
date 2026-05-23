@@ -1,0 +1,15 @@
+themes {
+  tokyo-night {
+    fg 248 248 242      // Light foreground for visibility
+    bg 26 27 38         // Dark background
+    black 0 0 0         // Pure black
+    red 255 85 85       // Bright red
+    green 80 250 123    // Bright green
+    yellow 255 255 0    // Pure yellow - HIGH VISIBILITY
+    blue 98 114 164     // Blue
+    magenta 255 0 255   // Pure magenta - HIGH VISIBILITY
+    cyan 0 255 255      // Pure cyan
+    white 255 255 255   // Pure white - for selection contrast
+    orange 255 165 0    // Bright orange - HIGH VISIBILITY
+  }
+}

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>portalgun · tools</title>
+  <style>
+    :root {
+      --bg: #1e1e2e; --fg: #cdd6f4; --gray: #313244; --gray-2: #45475a;
+      --blue: #89b4fa; --green: #a6e3a1; --yellow: #f9e2af; --red: #f38ba8;
+      --magenta: #cba6f7; --cyan: #89dceb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px;
+      background: var(--bg); color: var(--fg);
+      font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      font-size: 14px; line-height: 1.5;
+    }
+    header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 22px; color: var(--magenta); }
+    .meta { color: var(--gray-2); font-size: 12px; }
+    .totals { color: var(--blue); }
+    .controls { display: flex; gap: 8px; margin: 16px 0 20px; flex-wrap: wrap; align-items: center; }
+    input[type=search] {
+      flex: 1; min-width: 240px; padding: 8px 12px;
+      background: var(--gray); color: var(--fg); border: 1px solid var(--gray-2);
+      border-radius: 6px; font: inherit;
+    }
+    button {
+      padding: 6px 14px; background: var(--gray); color: var(--fg);
+      border: 1px solid var(--gray-2); border-radius: 6px; cursor: pointer; font: inherit;
+    }
+    button:hover { background: var(--gray-2); }
+    button.active { background: var(--blue); color: var(--bg); border-color: var(--blue); }
+    .section { margin-top: 24px; }
+    .section h2 { font-size: 16px; color: var(--cyan); margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--gray); }
+    th { color: var(--gray-2); font-weight: normal; font-size: 12px; text-transform: uppercase; }
+    tbody tr:hover { background: var(--gray); }
+    .name { color: var(--green); font-weight: 600; }
+    .repo a { color: var(--blue); text-decoration: none; }
+    .repo a:hover { text-decoration: underline; }
+    .path { color: var(--gray-2); font-size: 12px; }
+    .lang-tag {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; text-transform: uppercase; background: var(--gray-2);
+    }
+    .status { padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .status-ok { background: rgba(166, 227, 161, 0.2); color: var(--green); }
+    .status-build_failed { background: rgba(249, 226, 175, 0.2); color: var(--yellow); }
+    .status-skipped { background: rgba(137, 220, 235, 0.2); color: var(--cyan); }
+    .empty { color: var(--gray-2); padding: 12px; font-style: italic; }
+    code { background: var(--gray); padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+    .error { color: var(--red); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>portalgun · tools</h1>
+    <span class="meta">manifest: <code>/opt/tools-docs/portalgun_tools.json</code></span>
+    <span class="meta totals" id="totals">—</span>
+    <span class="meta" id="generated">—</span>
+  </header>
+
+  <div class="controls">
+    <input id="search" type="search" placeholder="filter by name, repo, path…" autofocus />
+    <button class="filter active" data-filter="all">all</button>
+    <button class="filter" data-filter="github">github</button>
+    <button class="filter" data-filter="apt">apt</button>
+    <button id="reload">↻ reload</button>
+  </div>
+
+  <div id="content"></div>
+
+<script>
+let DATA = null;
+let CURRENT_FILTER = 'all';
+
+async function load() {
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="empty">loading…</div>';
+  try {
+    const r = await fetch('portalgun_tools.json?_=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    DATA = await r.json();
+    document.getElementById('totals').textContent =
+      DATA.totals.total + ' tools (' + DATA.totals.github + ' github, ' + DATA.totals.apt + ' apt)';
+    document.getElementById('generated').textContent =
+      'generated ' + new Date(DATA.generated_at).toLocaleString();
+    render();
+  } catch (e) {
+    content.innerHTML = '<div class="empty error">failed to load manifest: ' + e.message +
+      '<br>Run <code>sudo portalgun install ...</code> at least once to create it, ' +
+      'or <code>sudo portalgun status</code> to verify paths.</div>';
+  }
+}
+
+function matchesSearch(t, q) {
+  if (!q) return true;
+  q = q.toLowerCase();
+  return JSON.stringify(t).toLowerCase().includes(q);
+}
+
+function render() {
+  if (!DATA) return;
+  const q = document.getElementById('search').value;
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  const sections = [];
+  if (CURRENT_FILTER === 'all' || CURRENT_FILTER === 'github') sections.push('github');
+  if (CURRENT_FILTER === 'all' || CURRENT_FILTER === 'apt')    sections.push('apt');
+
+  for (const kind of sections) {
+    const tools = (DATA.tools[kind] || []).filter(t => matchesSearch(t, q));
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    sec.innerHTML = '<h2>' + kind + ' (' + tools.length + ')</h2>';
+    if (tools.length === 0) {
+      sec.innerHTML += '<div class="empty">no entries</div>';
+    } else {
+      sec.appendChild(kind === 'github' ? githubTable(tools) : aptTable(tools));
+    }
+    content.appendChild(sec);
+  }
+}
+
+function githubTable(tools) {
+  const t = document.createElement('table');
+  t.innerHTML = `<thead><tr>
+    <th>name</th><th>repo</th><th>category</th><th>lang</th><th>status</th><th>commit</th><th>path</th>
+  </tr></thead><tbody></tbody>`;
+  const tb = t.querySelector('tbody');
+  tools.forEach(x => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="name">${esc(x.name)}</td>
+      <td class="repo"><a href="${esc(x.url)}" target="_blank">${esc(x.repo)}</a></td>
+      <td>${esc((x.os || '') + '/' + (x.category || ''))}</td>
+      <td><span class="lang-tag">${esc(x.language || 'none')}</span></td>
+      <td><span class="status status-${esc(x.status)}">${esc(x.status)}</span></td>
+      <td><code>${esc(x.commit || '')}</code></td>
+      <td class="path">${esc(x.tool_dir || x.target || '')}</td>`;
+    tb.appendChild(row);
+  });
+  return t;
+}
+
+function aptTable(tools) {
+  const t = document.createElement('table');
+  t.innerHTML = `<thead><tr>
+    <th>name</th><th>version</th><th>added</th>
+  </tr></thead><tbody></tbody>`;
+  const tb = t.querySelector('tbody');
+  tools.forEach(x => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="name">${esc(x.name)}</td>
+      <td><code>${esc(x.version || '')}</code></td>
+      <td class="path">${esc(x.added || '')}</td>`;
+    tb.appendChild(row);
+  });
+  return t;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('search').addEventListener('input', render);
+document.querySelectorAll('.filter').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.filter').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    CURRENT_FILTER = b.dataset.filter;
+    render();
+  });
+});
+document.getElementById('reload').addEventListener('click', load);
+
+load();
+</script>
+</body>
+</html>

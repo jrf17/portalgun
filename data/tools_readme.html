@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kali Pentest Arsenal</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --bg2: #161b22;
+            --bg3: #21262d;
+            --text: #c9d1d9;
+            --text2: #8b949e;
+            --blue: #58a6ff;
+            --green: #3fb950;
+            --orange: #d29922;
+            --red: #f85149;
+            --purple: #a371f7;
+            --border: #30363d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        header { background: var(--bg2); padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        header h1 { color: var(--blue); font-size: 1.3em; }
+        #search {
+            flex: 1; min-width: 200px; padding: 8px 12px;
+            background: var(--bg3); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 0.95em;
+        }
+        #search:focus { outline: none; border-color: var(--blue); }
+        .filter-btn {
+            padding: 6px 12px; background: var(--bg3); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); cursor: pointer; font-size: 0.8em;
+        }
+        .filter-btn:hover { border-color: var(--blue); }
+        .filter-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+        .export-btn {
+            padding: 6px 12px; background: var(--green); border: none;
+            border-radius: 6px; color: #fff; cursor: pointer; font-size: 0.8em;
+        }
+        .count { color: var(--text2); font-size: 0.85em; }
+        main { padding: 15px; }
+        .category { margin-bottom: 20px; }
+        .category h2 {
+            color: var(--green); font-size: 1em; margin-bottom: 8px;
+            padding-bottom: 5px; border-bottom: 1px solid var(--border);
+        }
+        .category.hidden { display: none; }
+        .tools { display: flex; flex-direction: column; gap: 4px; }
+        .tool {
+            background: var(--bg2); border: 1px solid var(--border); border-radius: 4px;
+            padding: 8px 12px; display: none;
+            flex-direction: row; align-items: center; gap: 10px;
+        }
+        .tool.visible { display: flex; }
+        .tool:hover { border-color: var(--blue); }
+        .tool-name { color: var(--blue); font-weight: 600; font-size: 0.9em; min-width: 140px; }
+        .tool-name a { color: var(--blue); text-decoration: none; }
+        .tool-type {
+            font-size: 0.65em; padding: 2px 5px; border-radius: 3px; min-width: 45px; text-align: center;
+        }
+        .tool-type.github { background: #238636; color: #fff; }
+        .tool-type.apt { background: #1f6feb; color: #fff; }
+        .tool-type.pip { background: var(--orange); color: #000; }
+        .tool-type.pipx { background: var(--purple); color: #fff; }
+        .tool-type.gem { background: var(--red); color: #fff; }
+        .tool-type.lib { background: var(--bg3); color: var(--text2); }
+        .tool-path { font-family: monospace; font-size: 0.75em; color: var(--text2); min-width: 200px; }
+        .tool-desc { font-size: 0.8em; color: var(--text); flex: 1; }
+        .tool-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+        .tag {
+            font-size: 0.6em; padding: 1px 5px; border-radius: 3px;
+            background: var(--bg3); color: var(--text2); cursor: pointer;
+        }
+        .tag:hover { background: var(--blue); color: #fff; }
+        .no-results { text-align: center; padding: 40px; color: var(--text2); display: none; }
+        .no-results.visible { display: block; }
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal.visible { display: flex; }
+        .modal-content {
+            background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+            padding: 20px; max-width: 700px; width: 90%; max-height: 80vh; overflow: auto;
+        }
+        .modal h3 { color: var(--blue); margin-bottom: 15px; }
+        .modal textarea {
+            width: 100%; height: 350px; background: var(--bg); border: 1px solid var(--border);
+            color: var(--text); padding: 10px; font-family: monospace; font-size: 0.8em; border-radius: 4px;
+        }
+        .modal-btns { display: flex; gap: 10px; margin-top: 15px; }
+        .modal-btns button { padding: 8px 16px; border-radius: 4px; cursor: pointer; border: none; }
+        .copy-btn { background: var(--blue); color: #fff; }
+        .close-btn { background: var(--bg3); color: var(--text); border: 1px solid var(--border) !important; }
+        @media (max-width: 800px) {
+            .tool { flex-direction: column; align-items: flex-start; gap: 4px; }
+            .tool-path { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Kali Pentest Arsenal</h1>
+        <input type="text" id="search" placeholder="Search (seimpersonate, kerberos, smb, potato, nmap...)">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="windows">Windows</button>
+        <button class="filter-btn" data-filter="linux">Linux</button>
+        <button class="filter-btn" data-filter="cloud">Cloud</button>
+        <button class="filter-btn" data-filter="web">Web</button>
+        <button class="filter-btn" data-filter="network">Network</button>
+        <button class="filter-btn" data-filter="library">Libraries</button>
+        <button class="filter-btn" data-filter="apt">APT</button>
+        <button class="export-btn" onclick="showExport()">Export</button>
+        <button class="filter-btn" onclick="showDotfiles()" style="background:#a371f7;border-color:#a371f7;color:#fff;">Dotfiles</button>
+        <span class="count"><span id="visible-count">0</span> tools</span>
+    </header>
+
+    <main>
+        <div class="category" data-cat="windows-ad"><h2>Windows - Active Directory</h2><div class="tools"></div></div>
+        <div class="category" data-cat="windows-privesc"><h2>Windows - Privilege Escalation</h2><div class="tools"></div></div>
+        <div class="category" data-cat="windows-creds"><h2>Windows - Credentials</h2><div class="tools"></div></div>
+        <div class="category" data-cat="linux"><h2>Linux</h2><div class="tools"></div></div>
+        <div class="category" data-cat="tunneling"><h2>Tunneling & C2</h2><div class="tools"></div></div>
+        <div class="category" data-cat="cloud"><h2>Cloud</h2><div class="tools"></div></div>
+        <div class="category" data-cat="container"><h2>Containers & Kubernetes</h2><div class="tools"></div></div>
+        <div class="category" data-cat="web"><h2>Web & API</h2><div class="tools"></div></div>
+        <div class="category" data-cat="network"><h2>Network & Scanning</h2><div class="tools"></div></div>
+        <div class="category" data-cat="wireless"><h2>Wireless</h2><div class="tools"></div></div>
+        <div class="category" data-cat="passwords"><h2>Passwords & Cracking</h2><div class="tools"></div></div>
+        <div class="category" data-cat="re"><h2>Reverse Engineering</h2><div class="tools"></div></div>
+        <div class="category" data-cat="forensics"><h2>Forensics</h2><div class="tools"></div></div>
+        <div class="category" data-cat="embedded"><h2>Embedded & IoT</h2><div class="tools"></div></div>
+        <div class="category" data-cat="evasion"><h2>Evasion</h2><div class="tools"></div></div>
+        <div class="category" data-cat="recon"><h2>Recon & OSINT</h2><div class="tools"></div></div>
+        <div class="category" data-cat="exploit"><h2>Exploitation Frameworks</h2><div class="tools"></div></div>
+        <div class="category" data-cat="sniffing"><h2>Sniffing & Spoofing</h2><div class="tools"></div></div>
+        <div class="category" data-cat="misc"><h2>Misc & Utilities</h2><div class="tools"></div></div>
+        <div class="category" data-cat="library"><h2>Python Libraries</h2><div class="tools"></div></div>
+        <div class="no-results" id="no-results">No tools found.</div>
+    </main>
+
+    <div class="modal" id="export-modal">
+        <div class="modal-content">
+            <h3>Export Tool List</h3>
+            <div style="margin-bottom:10px;">
+                <button class="filter-btn active" onclick="exportAs('txt')">TXT</button>
+                <button class="filter-btn" onclick="exportAs('csv')">CSV</button>
+                <button class="filter-btn" onclick="exportAs('json')">JSON</button>
+            </div>
+            <textarea id="export-content" readonly></textarea>
+            <div class="modal-btns">
+                <button class="copy-btn" onclick="copyExport()">Copy</button>
+                <button class="close-btn" onclick="closeExport()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="dotfiles-modal">
+        <div class="modal-content" style="max-width:800px;max-height:90vh;overflow-y:auto;">
+            <h3 style="color:#a371f7;margin-bottom:15px;">Config Manager</h3>
+
+            <!-- Category Tabs -->
+            <div style="display:flex;gap:5px;margin-bottom:15px;">
+                <button class="config-tab active" data-tab="zshrc" onclick="switchConfigTab('zshrc')">Zsh Config</button>
+                <button class="config-tab" data-tab="tmux" onclick="switchConfigTab('tmux')">Tmux</button>
+                <button class="config-tab" data-tab="zellij" onclick="switchConfigTab('zellij')">Zellij</button>
+            </div>
+
+            <!-- ZSHRC Panel -->
+            <div id="zshrc-panel" class="config-panel">
+                <div style="display:flex;gap:10px;margin-bottom:15px;">
+                    <select id="zshrc-select" onchange="loadZshConfig()" style="flex:1;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                        <option value="">-- Select config --</option>
+                        <option value="kali_default">Kali Default - Stock unmodified</option>
+                        <option value="p3ta">p3ta - Starship + FZF + Zoxide</option>
+                        <option value="jp">JP - NerdFonts style</option>
+                    </select>
+                </div>
+                <div id="zshrc-info" style="display:none;">
+                    <div style="display:flex;gap:10px;margin-bottom:15px;">
+                        <button onclick="installConfig('zshrc')" class="action-btn green">Install</button>
+                        <button onclick="editConfig('zshrc')" class="action-btn orange">Edit</button>
+                    </div>
+                    <div id="zshrc-status" class="status-box" style="display:none;"></div>
+                </div>
+            </div>
+
+            <!-- TMUX Panel -->
+            <div id="tmux-panel" class="config-panel" style="display:none;">
+                <div style="display:flex;gap:5px;margin-bottom:15px;">
+                    <button class="sub-tab active" data-subtab="tmux-theme" onclick="switchTmuxSubTab('tmux-theme')">Theme</button>
+                    <button class="sub-tab" data-subtab="tmux-hotkeys" onclick="switchTmuxSubTab('tmux-hotkeys')">Hotkeys</button>
+                </div>
+
+                <!-- Tmux Theme Sub-panel -->
+                <div id="tmux-theme-panel" class="sub-panel">
+                    <select id="tmux-theme-select" onchange="loadTmuxTheme()" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;margin-bottom:15px;">
+                        <option value="">-- Select theme --</option>
+                        <option value="catppuccin-mocha">Catppuccin Mocha (Default)</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="nord">Nord</option>
+                        <option value="gruvbox">Gruvbox Dark</option>
+                        <option value="tokyo-night">Tokyo Night</option>
+                    </select>
+                    <div id="tmux-theme-preview" style="display:none;margin-bottom:15px;">
+                        <div style="background:var(--bg);border-radius:6px;padding:10px;font-family:monospace;font-size:0.8em;">
+                            <div id="tmux-preview-bar" style="padding:8px 12px;border-radius:4px;display:flex;justify-content:space-between;">
+                                <span id="tmux-preview-left"></span>
+                                <span id="tmux-preview-right"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="tmux-theme-info" style="display:none;">
+                        <div style="display:flex;gap:10px;margin-bottom:15px;">
+                            <button onclick="installConfig('tmux-theme')" class="action-btn green">Install</button>
+                            <button onclick="editConfig('tmux-theme')" class="action-btn orange">Edit</button>
+                        </div>
+                        <div id="tmux-theme-status" class="status-box" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Tmux Hotkeys Sub-panel -->
+                <div id="tmux-hotkeys-panel" class="sub-panel" style="display:none;">
+                    <div style="display:flex;gap:10px;margin-bottom:15px;">
+                        <select id="tmux-hotkey-preset" onchange="loadTmuxHotkeyPreset()" style="flex:1;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                            <option value="">-- Load preset --</option>
+                            <option value="p3ta">p3ta hotkeys</option>
+                            <option value="default">Default tmux</option>
+                        </select>
+                        <button onclick="showTmuxHotkeyEditor()" class="action-btn purple">Create Custom</button>
+                    </div>
+
+                    <!-- Tmux Hotkey Editor -->
+                    <div id="tmux-hotkey-editor" style="display:none;">
+                        <div style="background:var(--bg);padding:15px;border-radius:6px;margin-bottom:15px;">
+                            <div style="margin-bottom:15px;">
+                                <label style="color:var(--text2);font-size:0.85em;">Config Name:</label>
+                                <input type="text" id="tmux-hotkey-name" placeholder="my-tmux-keys" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;margin-top:5px;">
+                            </div>
+                            <div style="color:var(--text2);font-size:0.85em;margin-bottom:10px;">Prefix Key: <code style="background:var(--bg3);padding:2px 8px;border-radius:3px;">Ctrl+b</code> then press:</div>
+
+                            <div class="hotkey-grid">
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Panes</div>
+                                    <div class="hotkey-row"><span>Split Vertical</span><input type="text" class="tmux-hotkey-input" data-action="split-v" maxlength="1" value="|"></div>
+                                    <div class="hotkey-row"><span>Split Horizontal</span><input type="text" class="tmux-hotkey-input" data-action="split-h" maxlength="1" value="-"></div>
+                                    <div class="hotkey-row"><span>Close Pane</span><input type="text" class="tmux-hotkey-input" data-action="kill-pane" maxlength="1" value="x"></div>
+                                    <div class="hotkey-row"><span>Fullscreen</span><input type="text" class="tmux-hotkey-input" data-action="fullscreen" maxlength="1" value="z"></div>
+                                </div>
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Windows</div>
+                                    <div class="hotkey-row"><span>New Window</span><input type="text" class="tmux-hotkey-input" data-action="new-window" maxlength="1" value="c"></div>
+                                    <div class="hotkey-row"><span>Close Window</span><input type="text" class="tmux-hotkey-input" data-action="kill-window" maxlength="1" value="&"></div>
+                                    <div class="hotkey-row"><span>Next Window</span><input type="text" class="tmux-hotkey-input" data-action="next-window" maxlength="1" value="n"></div>
+                                    <div class="hotkey-row"><span>Prev Window</span><input type="text" class="tmux-hotkey-input" data-action="prev-window" maxlength="1" value="p"></div>
+                                    <div class="hotkey-row"><span>Rename Window</span><input type="text" class="tmux-hotkey-input" data-action="rename-window" maxlength="1" value=","></div>
+                                </div>
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Navigation</div>
+                                    <div class="hotkey-row"><span>Pane Left</span><input type="text" class="tmux-hotkey-input" data-action="select-left" maxlength="1" value="h"></div>
+                                    <div class="hotkey-row"><span>Pane Down</span><input type="text" class="tmux-hotkey-input" data-action="select-down" maxlength="1" value="j"></div>
+                                    <div class="hotkey-row"><span>Pane Up</span><input type="text" class="tmux-hotkey-input" data-action="select-up" maxlength="1" value="k"></div>
+                                    <div class="hotkey-row"><span>Pane Right</span><input type="text" class="tmux-hotkey-input" data-action="select-right" maxlength="1" value="l"></div>
+                                </div>
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Other</div>
+                                    <div class="hotkey-row"><span>Reload Config</span><input type="text" class="tmux-hotkey-input" data-action="reload" maxlength="1" value="r"></div>
+                                    <div class="hotkey-row"><span>Copy Mode</span><input type="text" class="tmux-hotkey-input" data-action="copy-mode" maxlength="1" value="["></div>
+                                    <div class="hotkey-row"><span>List Sessions</span><input type="text" class="tmux-hotkey-input" data-action="list-sessions" maxlength="1" value="s"></div>
+                                    <div class="hotkey-row"><span>Detach</span><input type="text" class="tmux-hotkey-input" data-action="detach" maxlength="1" value="d"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button onclick="saveTmuxHotkeys()" class="action-btn green" style="flex:1;">Save & Install</button>
+                            <button onclick="hideTmuxHotkeyEditor()" class="action-btn" style="flex:1;background:var(--bg3);">Cancel</button>
+                        </div>
+                        <div id="tmux-hotkey-status" class="status-box" style="display:none;margin-top:15px;"></div>
+                    </div>
+
+                    <div id="tmux-hotkey-preset-info" style="display:none;">
+                        <div style="display:flex;gap:10px;margin-bottom:15px;">
+                            <button onclick="installConfig('tmux-hotkeys')" class="action-btn green">Install</button>
+                            <button onclick="editConfig('tmux-hotkeys')" class="action-btn orange">Edit</button>
+                        </div>
+                        <div id="tmux-hotkeys-status" class="status-box" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZELLIJ Panel -->
+            <div id="zellij-panel" class="config-panel" style="display:none;">
+                <div style="display:flex;gap:5px;margin-bottom:15px;">
+                    <button class="sub-tab active" data-subtab="zellij-config" onclick="switchSubTab('zellij-config')">Layout/Theme</button>
+                    <button class="sub-tab" data-subtab="zellij-hotkeys" onclick="switchSubTab('zellij-hotkeys')">Hotkeys</button>
+                </div>
+
+                <!-- Zellij Config Sub-panel -->
+                <div id="zellij-config-panel" class="sub-panel">
+                    <select id="zellij-config-select" onchange="loadZellijConfig()" style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;margin-bottom:15px;">
+                        <option value="">-- Select config --</option>
+                        <option value="p3ta">p3ta - Custom theme + zjstatus</option>
+                        <option value="default">Default Zellij</option>
+                    </select>
+                    <div id="zellij-config-info" style="display:none;">
+                        <div style="display:flex;gap:10px;margin-bottom:15px;">
+                            <button onclick="installConfig('zellij-config')" class="action-btn green">Install</button>
+                            <button onclick="editConfig('zellij-config')" class="action-btn orange">Edit</button>
+                        </div>
+                        <div id="zellij-config-status" class="status-box" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Zellij Hotkeys Sub-panel -->
+                <div id="zellij-hotkeys-panel" class="sub-panel" style="display:none;">
+                    <div style="display:flex;gap:10px;margin-bottom:15px;">
+                        <select id="hotkey-preset" onchange="loadHotkeyPreset()" style="flex:1;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                            <option value="">-- Load preset --</option>
+                            <option value="p3ta">p3ta hotkeys</option>
+                            <option value="default">Default Zellij</option>
+                        </select>
+                        <button onclick="showHotkeyEditor()" class="action-btn purple">Create Custom</button>
+                    </div>
+
+                    <!-- Hotkey Editor -->
+                    <div id="hotkey-editor" style="display:none;">
+                        <div style="background:var(--bg);padding:15px;border-radius:6px;margin-bottom:15px;">
+                            <div style="margin-bottom:15px;">
+                                <label style="color:var(--text2);font-size:0.85em;">Config Name:</label>
+                                <input type="text" id="hotkey-name" placeholder="my-hotkeys" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;margin-top:5px;">
+                            </div>
+                            <div style="color:var(--text2);font-size:0.85em;margin-bottom:10px;">Leader Key: <code style="background:var(--bg3);padding:2px 8px;border-radius:3px;">Ctrl+a</code> then press:</div>
+
+                            <div class="hotkey-grid">
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Panes</div>
+                                    <div class="hotkey-row"><span>Split Vertical</span><input type="text" class="hotkey-input" data-action="split-right" maxlength="1" value="n"></div>
+                                    <div class="hotkey-row"><span>Split Horizontal</span><input type="text" class="hotkey-input" data-action="split-down" maxlength="1" value="m"></div>
+                                    <div class="hotkey-row"><span>Close Pane</span><input type="text" class="hotkey-input" data-action="close-pane" maxlength="1" value="x"></div>
+                                    <div class="hotkey-row"><span>Fullscreen</span><input type="text" class="hotkey-input" data-action="fullscreen" maxlength="1" value="z"></div>
+                                    <div class="hotkey-row"><span>Float Toggle</span><input type="text" class="hotkey-input" data-action="float" maxlength="1" value="!"></div>
+                                </div>
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Tabs</div>
+                                    <div class="hotkey-row"><span>New Tab</span><input type="text" class="hotkey-input" data-action="new-tab" maxlength="1" value="c"></div>
+                                    <div class="hotkey-row"><span>Close Tab</span><input type="text" class="hotkey-input" data-action="close-tab" maxlength="1" value="&"></div>
+                                    <div class="hotkey-row"><span>Next Tab</span><input type="text" class="hotkey-input" data-action="next-tab" maxlength="1" value="N"></div>
+                                    <div class="hotkey-row"><span>Prev Tab</span><input type="text" class="hotkey-input" data-action="prev-tab" maxlength="1" value="p"></div>
+                                    <div class="hotkey-row"><span>Rename Tab</span><input type="text" class="hotkey-input" data-action="rename-tab" maxlength="1" value=","></div>
+                                </div>
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Navigation</div>
+                                    <div class="hotkey-row"><span>Move Left</span><input type="text" class="hotkey-input" data-action="move-left" maxlength="1" value="h"></div>
+                                    <div class="hotkey-row"><span>Move Down</span><input type="text" class="hotkey-input" data-action="move-down" maxlength="1" value="j"></div>
+                                    <div class="hotkey-row"><span>Move Up</span><input type="text" class="hotkey-input" data-action="move-up" maxlength="1" value="k"></div>
+                                    <div class="hotkey-row"><span>Move Right</span><input type="text" class="hotkey-input" data-action="move-right" maxlength="1" value="l"></div>
+                                </div>
+                                <div class="hotkey-section">
+                                    <div class="hotkey-section-title">Modes</div>
+                                    <div class="hotkey-row"><span>Resize Mode</span><input type="text" class="hotkey-input" data-action="resize-mode" maxlength="1" value="r"></div>
+                                    <div class="hotkey-row"><span>Scroll Mode</span><input type="text" class="hotkey-input" data-action="scroll-mode" maxlength="1" value="["></div>
+                                    <div class="hotkey-row"><span>Session Menu</span><input type="text" class="hotkey-input" data-action="session" maxlength="1" value="s"></div>
+                                    <div class="hotkey-row"><span>Detach</span><input type="text" class="hotkey-input" data-action="detach" maxlength="1" value="d"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button onclick="saveCustomHotkeys()" class="action-btn green" style="flex:1;">Save & Install</button>
+                            <button onclick="hideHotkeyEditor()" class="action-btn" style="flex:1;background:var(--bg3);">Cancel</button>
+                        </div>
+                        <div id="hotkey-status" class="status-box" style="display:none;margin-top:15px;"></div>
+                    </div>
+
+                    <div id="hotkey-preset-info" style="display:none;">
+                        <div style="display:flex;gap:10px;margin-bottom:15px;">
+                            <button onclick="installConfig('zellij-hotkeys')" class="action-btn green">Install</button>
+                            <button onclick="editConfig('zellij-hotkeys')" class="action-btn orange">Edit</button>
+                        </div>
+                        <div id="zellij-hotkeys-status" class="status-box" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="close-btn" onclick="closeDotfiles()" style="width:100%;margin-top:15px;">Close</button>
+        </div>
+    </div>
+
+    <style>
+        .config-tab, .sub-tab {
+            padding:10px 20px;background:var(--bg3);border:1px solid var(--border);
+            border-radius:6px;color:var(--text);cursor:pointer;font-size:0.9em;
+        }
+        .config-tab:hover, .sub-tab:hover { border-color:var(--blue); }
+        .config-tab.active { background:var(--blue);color:#fff;border-color:var(--blue); }
+        .sub-tab.active { background:var(--purple);color:#fff;border-color:var(--purple); }
+        .action-btn {
+            padding:12px 20px;border:none;border-radius:6px;color:#fff;
+            font-size:0.95em;font-weight:600;cursor:pointer;
+        }
+        .action-btn.green { background:#3fb950; }
+        .action-btn.orange { background:#d29922; }
+        .action-btn.purple { background:#a371f7; }
+        .action-btn:hover { opacity:0.9; }
+        .status-box {
+            padding:15px;border-radius:6px;text-align:center;
+        }
+        .status-box.success { background:rgba(63,185,80,0.15); }
+        .status-box.error { background:rgba(248,81,73,0.15); }
+        .hotkey-grid {
+            display:grid;grid-template-columns:1fr 1fr;gap:15px;
+        }
+        .hotkey-section {
+            background:var(--bg3);padding:12px;border-radius:6px;
+        }
+        .hotkey-section-title {
+            color:var(--blue);font-weight:600;font-size:0.9em;margin-bottom:10px;
+            border-bottom:1px solid var(--border);padding-bottom:5px;
+        }
+        .hotkey-row {
+            display:flex;justify-content:space-between;align-items:center;
+            padding:6px 0;font-size:0.85em;
+        }
+        .hotkey-input {
+            width:40px;padding:6px;text-align:center;background:var(--bg);
+            border:1px solid var(--border);border-radius:4px;color:var(--green);
+            font-family:monospace;font-size:1em;
+        }
+        .hotkey-input:focus { border-color:var(--blue);outline:none; }
+        @media (max-width:600px) {
+            .hotkey-grid { grid-template-columns:1fr; }
+        }
+    </style>
+
+<script>
+const toolsData = [
+    // ═══════════════════════════════════════════════════════════════
+    // WINDOWS - ACTIVE DIRECTORY
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Rubeus",path:"/opt/tools/windows/ad/rubeus/",desc:"Kerberos abuse - AS-REP roast, Kerberoast, tickets",type:"github",cat:"windows-ad",tags:["kerberos","asreproast","kerberoast","tickets","delegation","s4u"]},
+    {name:"Certify",path:"/opt/tools/windows/ad/certify/",desc:"AD Certificate Services abuse",type:"github",cat:"windows-ad",tags:["adcs","certificates","esc1","esc4","esc8"]},
+    {name:"Certipy",path:"/opt/tools/windows/ad/certipy/",desc:"AD CS exploitation (Python)",type:"github",cat:"windows-ad",tags:["adcs","certificates","esc1","esc4","esc8","shadow"]},
+    {name:"SharpHound",path:"/opt/tools/windows/ad/sharphound/",desc:"BloodHound data collector",type:"github",cat:"windows-ad",tags:["bloodhound","enumeration","graph"]},
+    {name:"BloodHound.py",path:"/opt/tools/windows/ad/bloodhound_py/",desc:"BloodHound Python collector",type:"github",cat:"windows-ad",tags:["bloodhound","enumeration","python"]},
+    {name:"BloodHound",path:"bloodhound",desc:"BloodHound CE - AD attack path analysis GUI",type:"apt",cat:"windows-ad",tags:["bloodhound","gui","graph","neo4j","paths","ce"]},
+    {name:"BloodHound-CE-Python",path:"bloodhound-ce-python",desc:"BloodHound CE Python ingestor",type:"apt",cat:"windows-ad",tags:["bloodhound","ingestor","ce","python"]},
+    {name:"RustHound",path:"~/.cargo/bin/rusthound",desc:"BloodHound Rust collector - fast AD enumeration",type:"github",cat:"windows-ad",tags:["bloodhound","enumeration","rust","ldap","fast"]},
+    {name:"Whisker",path:"/opt/tools/windows/ad/whisker/",desc:"Shadow credentials attack",type:"github",cat:"windows-ad",tags:["shadow","credentials","adcs"]},
+    {name:"PyWhisker",path:"/opt/tools/windows/ad/pywhisker/",desc:"Shadow credentials (Python)",type:"github",cat:"windows-ad",tags:["shadow","credentials","python"]},
+    {name:"Coercer",path:"/opt/tools/windows/ad/coercer/",desc:"Coerce Windows auth via multiple protocols",type:"github",cat:"windows-ad",tags:["coerce","petitpotam","relay"]},
+    {name:"PetitPotam",path:"/opt/tools/windows/ad/petitpotam/",desc:"NTLM relay via EFS",type:"github",cat:"windows-ad",tags:["coerce","relay","efs","ntlm"]},
+    {name:"Kerbrute",path:"/opt/tools/windows/ad/kerbrute_linux/",desc:"Kerberos user enum and spray",type:"github",cat:"windows-ad",tags:["kerberos","bruteforce","spray","userenum"]},
+    {name:"KrbRelayUp",path:"/opt/tools/windows/privesc/krbrelayup/",desc:"Kerberos relay privesc",type:"github",cat:"windows-ad",tags:["kerberos","relay","privesc","rbcd"]},
+    {name:"Krbrelayx",path:"/opt/tools/windows/ad/krbrelayx/",desc:"Kerberos relaying and delegation",type:"github",cat:"windows-ad",tags:["kerberos","relay","delegation"]},
+    {name:"TargetedKerberoast",path:"/opt/tools/windows/ad/targetedkerberoast/",desc:"Targeted Kerberoasting",type:"github",cat:"windows-ad",tags:["kerberoast","spn"]},
+    {name:"PKINITtools",path:"/opt/tools/windows/ad/pkinittools/",desc:"PKINIT Kerberos tools",type:"github",cat:"windows-ad",tags:["pkinit","kerberos","adcs"]},
+    {name:"PassTheCert",path:"/opt/tools/windows/ad/passtheccert/",desc:"Pass-the-certificate attacks",type:"github",cat:"windows-ad",tags:["certificates","adcs","pth"]},
+    {name:"noPac",path:"/opt/tools/windows/ad/nopac/",desc:"CVE-2021-42278 sAMAccountName spoof",type:"github",cat:"windows-ad",tags:["cve","samaccountname","dc"]},
+    {name:"Zerologon",path:"/opt/tools/windows/ad/zerologon/",desc:"CVE-2020-1472 Netlogon",type:"github",cat:"windows-ad",tags:["cve","zerologon","netlogon","dc"]},
+    {name:"PrintNightmare",path:"/opt/tools/windows/ad/printnightmare/",desc:"CVE-2021-1675 Print Spooler RCE",type:"github",cat:"windows-ad",tags:["cve","printnightmare","spooler","rce"]},
+    {name:"Impacket",path:"impacket",desc:"SMB/LDAP/Kerberos/WMI protocols",type:"pip",cat:"windows-ad",tags:["smb","ldap","kerberos","wmi","secretsdump","psexec","wmiexec","smbexec","atexec","dcom"]},
+    {name:"NetExec",path:"netexec",desc:"SMB/LDAP/WinRM/MSSQL Swiss army knife",type:"apt",cat:"windows-ad",tags:["smb","ldap","winrm","mssql","spray","enum","cme","crackmapexec"]},
+    {name:"PowerView.py",path:"/opt/tools/windows/ad/powerview_py/",desc:"PowerView in Python",type:"github",cat:"windows-ad",tags:["enumeration","ldap","python"]},
+    {name:"ADRecon",path:"/opt/tools/windows/ad/adrecon/",desc:"AD recon with Excel reports",type:"github",cat:"windows-ad",tags:["enumeration","recon","report"]},
+    {name:"Godap",path:"/opt/tools/windows/ad/godap/",desc:"LDAP browser TUI",type:"github",cat:"windows-ad",tags:["ldap","browser","tui"]},
+    {name:"LdapRelayScan",path:"/opt/tools/windows/ad/ldaprelayscan/",desc:"Check LDAP relay protections",type:"github",cat:"windows-ad",tags:["ldap","relay","signing"]},
+    {name:"SprayHound",path:"/opt/tools/windows/ad/sprayhound/",desc:"Password spray + BloodHound",type:"github",cat:"windows-ad",tags:["spray","bloodhound"]},
+    {name:"Masky",path:"/opt/tools/windows/ad/masky/",desc:"ADCS abuse via PKINIT",type:"github",cat:"windows-ad",tags:["adcs","pkinit"]},
+    {name:"SharpSCCM",path:"/opt/tools/windows/ad/sharpsccm/",desc:"SCCM/MECM lateral movement and code execution",type:"github",cat:"windows-ad",tags:["sccm","mecm","lateral","configmgr"]},
+    {name:"RunasCs",path:"/opt/tools/windows/ad/runascs/",desc:"Run commands as another user with password/NTLM",type:"github",cat:"windows-ad",tags:["runas","credentials","impersonation","pth"]},
+    {name:"SharpGPOAbuse",path:"/opt/tools/windows/ad/sharpgpoabuse/",desc:"Abuse GPO permissions for code exec/persistence",type:"github",cat:"windows-ad",tags:["gpo","abuse","persistence","scheduled"]},
+    {name:"PowerMad",path:"/opt/tools/windows/ad/powermad/",desc:"MachineAccountQuota abuse for RBCD attacks",type:"github",cat:"windows-ad",tags:["machineaccount","maq","rbcd","delegation"]},
+    {name:"Inveigh",path:"/opt/tools/windows/ad/inveigh/",desc:"LLMNR/NBNS/mDNS/DNS poisoner and relay",type:"github",cat:"windows-ad",tags:["mitm","relay","llmnr","nbns","mdns","poison","ntlm"]},
+    {name:"DSInternals",path:"/opt/tools/windows/ad/dsinternals_ps/",desc:"AD database (ntds.dit) manipulation and extraction",type:"github",cat:"windows-ad",tags:["ntds","database","dpapi","password","offline"]},
+    {name:"enum4linux-ng",path:"enum4linux-ng",desc:"SMB/Samba enumeration (Python rewrite)",type:"apt",cat:"windows-ad",tags:["smb","samba","enumeration","shares"]},
+    {name:"enum4linux",path:"enum4linux",desc:"SMB/Samba enumeration (legacy Perl)",type:"apt",cat:"windows-ad",tags:["smb","samba","enumeration","shares","perl"]},
+    {name:"smbclient",path:"smbclient",desc:"SMB client",type:"apt",cat:"windows-ad",tags:["smb","shares","client"]},
+    {name:"smbmap",path:"smbmap",desc:"SMB share enumeration",type:"apt",cat:"windows-ad",tags:["smb","shares","permissions"]},
+    {name:"rpcclient",path:"rpcclient",desc:"MS-RPC client",type:"apt",cat:"windows-ad",tags:["rpc","enumeration","msrpc"]},
+    {name:"ldapsearch",path:"ldap-utils",desc:"LDAP query tool",type:"apt",cat:"windows-ad",tags:["ldap","query","search"]},
+    {name:"evil-winrm",path:"evil-winrm",desc:"WinRM shell",type:"apt",cat:"windows-ad",tags:["winrm","shell","powershell"]},
+    {name:"ADIDNSdump",path:"adidnsdump",desc:"Dump AD DNS records via LDAP",type:"apt",cat:"windows-ad",tags:["dns","ad","ldap","enumeration"]},
+    {name:"LDAPdomaindump",path:"ldapdomaindump",desc:"Dump AD info via LDAP to HTML/JSON",type:"apt",cat:"windows-ad",tags:["ldap","dump","enumeration","html","json"]},
+    {name:"Windapsearch",path:"windapsearch",desc:"LDAP enumeration for AD",type:"apt",cat:"windows-ad",tags:["ldap","enumeration","users","groups","computers"]},
+    {name:"Kerberoast",path:"kerberoast",desc:"Kerberoasting attack scripts",type:"apt",cat:"windows-ad",tags:["kerberos","spn","tgs","crack"]},
+    {name:"ADPeas",path:"/opt/tools/windows/ad/adpeas/",desc:"PowerShell AD enumeration automation",type:"github",cat:"windows-ad",tags:["enumeration","powershell","automated"]},
+    {name:"ADenumeration",path:"/opt/tools/windows/ad/adenumeration/",desc:"AD enumeration scripts collection",type:"github",cat:"windows-ad",tags:["enumeration","scripts","collection"]},
+    {name:"ADSyncDecrypt",path:"/opt/tools/windows/ad/adsyncdecrypt/",desc:"Azure AD Connect password decryption",type:"github",cat:"windows-ad",tags:["azure","adsync","password","decrypt"]},
+    {name:"Max_AD",path:"/opt/tools/windows/ad/max_ad/",desc:"AD environment analysis and attack paths",type:"github",cat:"windows-ad",tags:["analysis","attack","paths","graph"]},
+    {name:"Pre2k",path:"/opt/tools/windows/ad/pre2k/",desc:"Pre-Windows 2000 computer account attacks",type:"github",cat:"windows-ad",tags:["computer","account","legacy","privesc"]},
+    {name:"FindGPPPasswords",path:"/opt/tools/windows/ad/findgpppasswords/",desc:"Find passwords in Group Policy Preferences",type:"github",cat:"windows-ad",tags:["gpp","cpassword","xml","sysvol"]},
+    {name:"SCCMHound",path:"/opt/tools/windows/ad/sccmhound/",desc:"SCCM BloodHound integration",type:"github",cat:"windows-ad",tags:["sccm","mecm","bloodhound","graph"]},
+    {name:"LapsToolkit",path:"/opt/tools/windows/ad/lapstoolkit/",desc:"LAPS auditing and exploitation",type:"github",cat:"windows-ad",tags:["laps","audit","password","localadmin"]},
+    {name:"RemoteMonologue",path:"/opt/tools/windows/ad/remotemonologue/",desc:"Remote NetNTLM downgrade via RPC",type:"github",cat:"windows-ad",tags:["netntlm","downgrade","rpc","relay"]},
+    {name:"SpoolSample",path:"/opt/tools/windows/ad/spoolsample/",desc:"Print Spooler coercion (Printer Bug)",type:"github",cat:"windows-ad",tags:["spooler","coerce","printerbug","relay"]},
+    {name:"InvokeMimikatz",path:"/opt/tools/windows/ad/invokemimikatz/",desc:"PowerShell Mimikatz wrapper",type:"github",cat:"windows-ad",tags:["mimikatz","powershell","credentials"]},
+    {name:"PowerView",path:"/opt/tools/windows/ad/powerview/",desc:"PowerShell AD recon (PowerSploit)",type:"github",cat:"windows-ad",tags:["enumeration","powershell","recon","acl"]},
+    {name:"PowerUpSQL",path:"/opt/tools/windows/ad/powerupsql/",desc:"SQL Server discovery and exploitation",type:"github",cat:"windows-ad",tags:["sql","mssql","discovery","privesc","links"]},
+    {name:"PowerCat",path:"/opt/tools/windows/ad/powercat/",desc:"PowerShell netcat implementation",type:"github",cat:"windows-ad",tags:["netcat","powershell","reverse","bind"]},
+    {name:"SharpView",path:"/opt/tools/windows/ad/sharpview/",desc:"C# PowerView port",type:"github",cat:"windows-ad",tags:["enumeration","csharp","recon","acl"]},
+    {name:"SharpMad",path:"/opt/tools/windows/ad/sharpmad/",desc:"C# MachineAccountQuota exploitation",type:"github",cat:"windows-ad",tags:["maq","machineaccount","rbcd","csharp"]},
+    {name:"SharpMove",path:"/opt/tools/windows/ad/sharpmove/",desc:"Lateral movement via various methods",type:"github",cat:"windows-ad",tags:["lateral","wmi","dcom","scm","task"]},
+    {name:"SharpRDP",path:"/opt/tools/windows/ad/sharprdp/",desc:"RDP command execution",type:"github",cat:"windows-ad",tags:["rdp","lateral","command","execution"]},
+    {name:"SharpSuccessor",path:"/opt/tools/windows/ad/sharpsuccessor/",desc:"AD inheritance and ACL exploitation",type:"github",cat:"windows-ad",tags:["acl","inheritance","dacl","writedacl"]},
+    {name:"LogonSessionAuditor",path:"/opt/tools/windows/ad/logonsessionauditor/",desc:"Enumerate logon sessions remotely",type:"github",cat:"windows-ad",tags:["sessions","logon","enumeration","remote"]},
+    {name:"WinRMExec",path:"/opt/tools/windows/ad/winrmexec/",desc:"WinRM command execution",type:"github",cat:"windows-ad",tags:["winrm","lateral","execution"]},
+    {name:"Impacket-scripts",path:"impacket-scripts",desc:"Impacket tool collection - secretsdump, wmiexec, psexec, etc",type:"apt",cat:"windows-ad",tags:["impacket","secretsdump","wmiexec","psexec","ntlmrelayx","smbserver"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // WINDOWS - PRIVILEGE ESCALATION
+    // ═══════════════════════════════════════════════════════════════
+    {name:"GodPotato",path:"/opt/tools/windows/privesc/godpotato/",desc:"SeImpersonate to SYSTEM",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","token","system","privesc"]},
+    {name:"PrintSpoofer",path:"/opt/tools/windows/privesc/printspoofer64/",desc:"SeImpersonate via Spooler",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","spooler","system","privesc"]},
+    {name:"JuicyPotato",path:"/opt/tools/windows/privesc/juicypotato/",desc:"SeImpersonate abuse",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","seassignprimarytoken","system","privesc"]},
+    {name:"RoguePotato",path:"/opt/tools/windows/privesc/roguepotato/",desc:"SeImpersonate (no local auth)",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","system","privesc"]},
+    {name:"SweetPotato",path:"/opt/tools/windows/privesc/sweetpotato/",desc:"Potato exploit collection",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","system","privesc"]},
+    {name:"SigmaPotato",path:"/opt/tools/windows/privesc/sigmapotato/",desc:"Latest potato variant",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","system","privesc"]},
+    {name:"SharpEfsPotato",path:"/opt/tools/windows/privesc/sharpefspotato/",desc:"EFS potato",type:"github",cat:"windows-privesc",tags:["potato","seimpersonate","efs","privesc"]},
+    {name:"WinPEAS",path:"/opt/tools/windows/enumeration/winpeas_x64/",desc:"Windows privesc scanner",type:"github",cat:"windows-privesc",tags:["enumeration","privesc","scanner"]},
+    {name:"Seatbelt",path:"/opt/tools/windows/enumeration/seatbelt/",desc:"Security host survey",type:"github",cat:"windows-privesc",tags:["enumeration","survey"]},
+    {name:"SharpUp",path:"/opt/tools/windows/enumeration/sharpup/",desc:"Privesc checks",type:"github",cat:"windows-privesc",tags:["enumeration","privesc"]},
+    {name:"Snaffler",path:"/opt/tools/windows/enumeration/snaffler/",desc:"Find sensitive files",type:"github",cat:"windows-privesc",tags:["shares","files","sensitive"]},
+    {name:"windows-exploit-suggester",path:"windows-exploit-suggester",desc:"Windows exploit suggester",type:"apt",cat:"windows-privesc",tags:["exploit","suggester","cve"]},
+    {name:"EfsPotato",path:"/opt/tools/windows/privesc/efspotato/",desc:"EFS-based potato privilege escalation",type:"github",cat:"windows-privesc",tags:["potato","efs","seimpersonate","system"]},
+    {name:"KernelInit",path:"/opt/tools/windows/privesc/kernelinit/",desc:"Kernel exploitation framework",type:"github",cat:"windows-privesc",tags:["kernel","exploit","driver"]},
+    {name:"PatronusX",path:"/opt/tools/windows/privesc/patronusx/",desc:"Windows privilege escalation scanner",type:"github",cat:"windows-privesc",tags:["scanner","privesc","misconfig"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // WINDOWS - CREDENTIALS
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Mimikatz",path:"/opt/tools/windows/credentials/mimikatz/",desc:"Windows credential extraction - sekurlsa, kerberos, dpapi, sam, dcsync",type:"github",cat:"windows-creds",tags:["credentials","lsass","sekurlsa","dpapi","sam","dcsync","pth","golden","silver"]},
+    {name:"SharpKatz",path:"/opt/tools/windows/credentials/sharpkatz/",desc:"C# Mimikatz implementation for BOF/inline",type:"github",cat:"windows-creds",tags:["credentials","lsass","sekurlsa","csharp","bof"]},
+    {name:"Pypykatz",path:"pypykatz",desc:"Mimikatz in Python - offline LSASS/registry/SAM parsing",type:"pip",cat:"windows-creds",tags:["credentials","lsass","minidump","python","registry","sam","offline"]},
+    {name:"Nanodump",path:"/opt/tools/windows/credentials/nanodump/",desc:"Stealthy LSASS dump via syscalls - EDR evasion",type:"github",cat:"windows-creds",tags:["lsass","dump","stealthy","syscall","edr","bof"]},
+    {name:"SharpDPAPI",path:"/opt/tools/windows/credentials/sharpdpapi/",desc:"DPAPI credential extraction - masterkey, chrome, vault",type:"github",cat:"windows-creds",tags:["dpapi","credentials","masterkey","chrome","vault","backupkey"]},
+    {name:"DPloot",path:"/opt/tools/windows/credentials/dploot/",desc:"Remote DPAPI looting via SMB - creds, wifi, browser",type:"github",cat:"windows-creds",tags:["dpapi","remote","python","smb","wifi","browser"]},
+    {name:"LaZagne",path:"/opt/tools/windows/credentials/lazagne/",desc:"Multi-app credential recovery - browsers, wifi, mail, db",type:"github",cat:"windows-creds",tags:["credentials","browsers","wifi","mail","database","git"]},
+    {name:"SharpChrome",path:"/opt/tools/windows/credentials/sharpchrome/",desc:"Chrome credential and cookie extraction",type:"github",cat:"windows-creds",tags:["chrome","browser","credentials","cookies","logins"]},
+    {name:"SharpLAPS",path:"/opt/tools/windows/credentials/sharplaps/",desc:"Retrieve LAPS passwords from AD",type:"github",cat:"windows-creds",tags:["laps","password","ad","localadmin"]},
+    {name:"GMSAPasswordReader",path:"/opt/tools/windows/credentials/gmsapasswordreader/",desc:"Read Group Managed Service Account passwords",type:"github",cat:"windows-creds",tags:["gmsa","password","serviceaccount","ad"]},
+    {name:"Lsassy",path:"lsassy",desc:"Remote LSASS dump and parse via SMB/WMI/Task",type:"pip",cat:"windows-creds",tags:["lsass","remote","dump","smb","wmi","procdump"]},
+    {name:"secretsdump",path:"impacket-secretsdump",desc:"Dump secrets remotely",type:"apt",cat:"windows-creds",tags:["secrets","sam","ntds","dcsync"]},
+    {name:"BetterSafetyKatz",path:"/opt/tools/windows/credentials/bettersafetykatz/",desc:"SafetyKatz fork with improvements",type:"github",cat:"windows-creds",tags:["mimikatz","safetykatz","minidump","lsass"]},
+    {name:"FadCrypt",path:"/opt/tools/windows/credentials/fadcrypt/",desc:"DPAPI/credential file decryption",type:"github",cat:"windows-creds",tags:["dpapi","decrypt","credentials"]},
+    {name:"ForgeCert",path:"/opt/tools/windows/credentials/forgecert/",desc:"Forge certificates for AD CS attacks",type:"github",cat:"windows-creds",tags:["adcs","certificate","forge","golden"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // LINUX
+    // ═══════════════════════════════════════════════════════════════
+    {name:"LinPEAS",path:"/opt/tools/linux/enumeration/linpeas/",desc:"Linux privesc scanner",type:"github",cat:"linux",tags:["enumeration","privesc","suid","capabilities"]},
+    {name:"LSE",path:"/opt/tools/linux/enumeration/lse/",desc:"Linux Smart Enumeration",type:"github",cat:"linux",tags:["enumeration","privesc"]},
+    {name:"pspy",path:"/opt/tools/linux/enumeration/pspy64/",desc:"Process snoop without root",type:"github",cat:"linux",tags:["processes","cron","noroot"]},
+    {name:"Linux Exploit Suggester",path:"/opt/tools/linux/privesc/linux_exploit_suggester/",desc:"Kernel exploit suggester",type:"github",cat:"linux",tags:["kernel","exploit","cve"]},
+    {name:"Traitor",path:"/opt/tools/linux/privesc/traitor/",desc:"Auto Linux privesc",type:"github",cat:"linux",tags:["privesc","automated"]},
+    {name:"GTFONow",path:"/opt/tools/linux/privesc/gtfonow/",desc:"GTFOBins checker",type:"github",cat:"linux",tags:["gtfobins","suid","sudo"]},
+    {name:"SUDO_KILLER",path:"/opt/tools/linux/privesc/sudo_killer/",desc:"Sudo misconfig checker",type:"github",cat:"linux",tags:["sudo","misconfiguration"]},
+    {name:"SSH-Snake",path:"/opt/tools/linux/lateral/ssh_snake/",desc:"SSH lateral movement",type:"github",cat:"linux",tags:["ssh","lateral","pivot"]},
+    {name:"Penelope",path:"/opt/tools/linux/shells/penelope/",desc:"Shell handler",type:"github",cat:"linux",tags:["shell","handler","pty"]},
+    {name:"pwncat-cs",path:"pwncat-cs",desc:"Fancy shell handler",type:"pip",cat:"linux",tags:["shell","handler","persistence"]},
+    {name:"lynis",path:"lynis",desc:"Security auditing",type:"apt",cat:"linux",tags:["audit","hardening","security"]},
+    {name:"chkrootkit",path:"chkrootkit",desc:"Rootkit checker",type:"apt",cat:"linux",tags:["rootkit","detection"]},
+    {name:"rkhunter",path:"rkhunter",desc:"Rootkit hunter",type:"apt",cat:"linux",tags:["rootkit","detection"]},
+    {name:"Linux-exploit-suggester2",path:"/opt/tools/linux/privesc/linux_exploit_suggester2/",desc:"Perl kernel exploit suggester",type:"github",cat:"linux",tags:["kernel","exploit","cve","suggester"]},
+    {name:"Libc-database",path:"/opt/tools/linux/exploit/libc_database/",desc:"Libc offset database for ROP",type:"github",cat:"linux",tags:["libc","rop","offsets","pwn"]},
+    {name:"PyJailBreaker",path:"/opt/tools/linux/exploit/pyjailbreaker/",desc:"Python jail escape techniques",type:"github",cat:"linux",tags:["python","jail","escape","sandbox"]},
+    {name:"Fenjing",path:"/opt/tools/linux/exploit/fenjing/",desc:"SSTI/template injection exploitation",type:"github",cat:"linux",tags:["ssti","jinja","template","injection"]},
+    {name:"TotalRecall",path:"/opt/tools/linux/exploit/totalrecall/",desc:"Memory extraction and analysis",type:"github",cat:"linux",tags:["memory","extraction","dump"]},
+    {name:"eCapture",path:"/opt/tools/linux/c2/ecapture/",desc:"eBPF-based SSL/TLS traffic capture",type:"github",cat:"linux",tags:["ebpf","ssl","tls","capture","keylog"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // TUNNELING & C2
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Chisel",path:"/opt/tools/tunneling/chisel/",desc:"Fast TCP/UDP tunnel over HTTP with SOCKS5 proxy",type:"github",cat:"tunneling",tags:["tunnel","http","socks","portforward","pivot","reverse"]},
+    {name:"Ligolo-ng",path:"/opt/tools/tunneling/ligolo-ng/",desc:"TUN interface tunnel - no SOCKS, direct routing",type:"github",cat:"tunneling",tags:["tunnel","tun","pivot","agent","proxy"]},
+    {name:"Sliver",path:"sliver",desc:"Multi-player C2 with implants, beacons, pivots",type:"apt",cat:"tunneling",tags:["c2","implant","beacon","pivot","mtls","dns","http"]},
+    {name:"Reverse SSH",path:"/opt/tools/tunneling/c2/reverse_ssh_client/",desc:"Reverse SSH connection with portforwarding",type:"github",cat:"tunneling",tags:["ssh","reverse","tunnel","portforward"]},
+    {name:"Darkflare",path:"/opt/tools/tunneling/c2/darkflare/",desc:"Tunnel TCP traffic through Cloudflare CDN",type:"github",cat:"tunneling",tags:["cloudflare","tunnel","cdn","bypass","firewall"]},
+    {name:"proxychains4",path:"proxychains4",desc:"Proxy chains",type:"apt",cat:"tunneling",tags:["proxy","socks","tunnel"]},
+    {name:"socat",path:"socat",desc:"Multipurpose relay",type:"apt",cat:"tunneling",tags:["relay","tunnel","socket"]},
+    {name:"stunnel4",path:"stunnel4",desc:"SSL tunnel",type:"apt",cat:"tunneling",tags:["ssl","tls","tunnel"]},
+    {name:"sshuttle",path:"sshuttle",desc:"VPN over SSH",type:"apt",cat:"tunneling",tags:["vpn","ssh","tunnel"]},
+    {name:"Cryptcat",path:"cryptcat",desc:"Encrypted netcat with twofish",type:"apt",cat:"tunneling",tags:["netcat","encrypted","twofish","backdoor"]},
+    {name:"DBD",path:"dbd",desc:"Encrypted Netcat clone with AES-CBC",type:"apt",cat:"tunneling",tags:["netcat","encrypted","aes","backdoor"]},
+    {name:"SBD",path:"sbd",desc:"Secure backdoor with AES-CBC encryption",type:"apt",cat:"tunneling",tags:["backdoor","encrypted","aes","bind","reverse"]},
+    {name:"Proxytunnel",path:"proxytunnel",desc:"Tunnel through HTTP proxies",type:"apt",cat:"tunneling",tags:["http","proxy","tunnel","connect"]},
+    {name:"Ptunnel",path:"ptunnel",desc:"TCP over ICMP tunnel",type:"apt",cat:"tunneling",tags:["icmp","tunnel","ping","firewall"]},
+    {name:"Pwnat",path:"pwnat",desc:"NAT traversal without port forwarding",type:"apt",cat:"tunneling",tags:["nat","punch","firewall","p2p"]},
+    {name:"UDPtunnel",path:"udptunnel",desc:"Tunnel TCP over UDP",type:"apt",cat:"tunneling",tags:["udp","tcp","tunnel","firewall"]},
+    {name:"SSLH",path:"sslh",desc:"Protocol multiplexer - SSH/HTTPS/OpenVPN on port 443",type:"apt",cat:"tunneling",tags:["multiplexer","ssl","ssh","openvpn","443"]},
+    {name:"Goncat",path:"/opt/tools/tunneling/c2/goncat/",desc:"Go netcat with encryption support",type:"github",cat:"tunneling",tags:["netcat","go","encrypted","reverse"]},
+    {name:"Gorsh",path:"/opt/tools/tunneling/c2/gorsh/",desc:"Go reverse shell with encryption",type:"github",cat:"tunneling",tags:["reverse","shell","go","encrypted"]},
+    {name:"GoExec",path:"/opt/tools/linux/c2/goexec/",desc:"Remote command execution via various methods",type:"github",cat:"tunneling",tags:["lateral","wmi","smb","exec","go"]},
+    {name:"OpenVPN",path:"openvpn",desc:"SSL VPN solution",type:"apt",cat:"tunneling",tags:["vpn","ssl","tunnel","tun","tap"]},
+    {name:"VPNC",path:"vpnc",desc:"Cisco VPN client",type:"apt",cat:"tunneling",tags:["vpn","cisco","ipsec","client"]},
+    {name:"Miredo",path:"miredo",desc:"Teredo IPv6 tunneling",type:"apt",cat:"tunneling",tags:["ipv6","teredo","tunnel","nat"]},
+    {name:"Redsocks",path:"redsocks",desc:"Redirect connections through SOCKS proxy",type:"apt",cat:"tunneling",tags:["socks","proxy","redirect","transparent"]},
+    {name:"Rebind",path:"rebind",desc:"DNS rebinding attack tool",type:"apt",cat:"tunneling",tags:["dns","rebinding","attack","bypass"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // CLOUD
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Pacu",path:"~/.local/bin/pacu",desc:"AWS exploitation framework with 30+ modules",type:"pipx",cat:"cloud",tags:["aws","exploit","privesc","enum","persistence","lambda","ec2","iam"]},
+    {name:"Prowler",path:"~/.local/bin/prowler",desc:"Cloud security posture for AWS/Azure/GCP/K8s",type:"pipx",cat:"cloud",tags:["aws","azure","gcp","compliance","cis","pci","hipaa"]},
+    {name:"ScoutSuite",path:"~/.local/bin/scout",desc:"Multi-cloud security auditing with HTML reports",type:"pipx",cat:"cloud",tags:["aws","azure","gcp","audit","misconfig","report"]},
+    {name:"CloudFox",path:"/opt/tools/cloud/aws/cloudfox/",desc:"Find exploitable attack paths in AWS/Azure",type:"github",cat:"cloud",tags:["aws","azure","attackpath","privesc","secrets","credentials"]},
+    {name:"AzureHound",path:"/opt/tools/cloud/azure/azurehound/",desc:"Azure/Entra AD data collector for BloodHound",type:"github",cat:"cloud",tags:["azure","bloodhound","entra","aad","graph"]},
+    {name:"ROADtools",path:"roadrecon",desc:"Azure AD recon and token manipulation",type:"pip",cat:"cloud",tags:["azure","aad","recon","token","prt","roadrecon"]},
+    {name:"Stormspotter",path:"/opt/tools/cloud/azure/stormspotter/",desc:"Azure attack graph visualization",type:"github",cat:"cloud",tags:["azure","graph","visualization","rbac"]},
+    {name:"MicroBurst",path:"/opt/tools/cloud/azure/microburst/",desc:"Azure services attack toolkit (PS)",type:"github",cat:"cloud",tags:["azure","powershell","storage","keyvault","webapp"]},
+    {name:"AADInternals",path:"/opt/tools/cloud/azure/aadinternals/",desc:"Azure AD/M365 admin toolkit - PTA/PHS/tokens",type:"github",cat:"cloud",tags:["azure","aad","o365","pta","phs","token","backdoor"]},
+    {name:"PowerZure",path:"/opt/tools/cloud/azure/powerzure/",desc:"Azure offensive toolkit - runbooks, VMs, keyvault",type:"github",cat:"cloud",tags:["azure","exploit","runbook","vm","keyvault"]},
+    {name:"GraphRunner",path:"/opt/tools/cloud/o365/graphrunner/",desc:"MS Graph API post-exploitation and persistence",type:"github",cat:"cloud",tags:["msgraph","o365","api","token","persistence","enum"]},
+    {name:"TeamFiltration",path:"/opt/tools/cloud/o365/teamfiltration/",desc:"O365/Teams enumeration, spraying, exfiltration",type:"github",cat:"cloud",tags:["o365","teams","spray","enum","exfil","attachments"]},
+    {name:"TREVORspray",path:"/opt/tools/cloud/o365/trevorspray/",desc:"Multi-threaded O365 password sprayer with lockout avoidance",type:"github",cat:"cloud",tags:["o365","spray","aad","lockout"]},
+    {name:"MSOLSpray",path:"/opt/tools/cloud/o365/msolspray/",desc:"Microsoft Online password spray",type:"github",cat:"cloud",tags:["o365","spray","userenum"]},
+    {name:"Ruler",path:"/opt/tools/cloud/o365/ruler/",desc:"Exchange rules and forms RCE",type:"github",cat:"cloud",tags:["exchange","o365","rules","forms","rce","mapi"]},
+    {name:"MailSniper",path:"/opt/tools/cloud/o365/mailsniper/",desc:"Exchange mailbox search and GAL enum",type:"github",cat:"cloud",tags:["exchange","mail","gal","owa","ews","search"]},
+    {name:"GCP Scanner",path:"/opt/tools/cloud/gcp/gcp_scanner/",desc:"GCP resources and permissions scanner",type:"github",cat:"cloud",tags:["gcp","scanner","iam","compute","storage"]},
+    {name:"gcpwn",path:"/opt/tools/cloud/gcp/gcpwn/",desc:"GCP exploitation framework",type:"github",cat:"cloud",tags:["gcp","exploit","privesc","compute","functions"]},
+    {name:"S3Scanner",path:"/opt/tools/cloud/aws/s3scanner/",desc:"Find misconfigured S3 buckets",type:"github",cat:"cloud",tags:["aws","s3","buckets","public","misconfig"]},
+    {name:"CloudBrute",path:"/opt/tools/cloud/multi/cloudbrute/",desc:"Enumerate cloud resources across providers",type:"github",cat:"cloud",tags:["multicloud","enumeration","bruteforce","storage"]},
+    {name:"Enumerate-IAM",path:"/opt/tools/cloud/aws/enumerate_iam/",desc:"Brute-force AWS IAM permissions",type:"github",cat:"cloud",tags:["aws","iam","permissions","bruteforce"]},
+    {name:"PMapper",path:"/opt/tools/cloud/aws/pmapper/",desc:"AWS IAM privilege escalation paths",type:"github",cat:"cloud",tags:["aws","iam","privesc","graph","visualization"]},
+    {name:"awscli",path:"awscli",desc:"AWS CLI",type:"apt",cat:"cloud",tags:["aws","cli"]},
+    {name:"AWS-Consoler",path:"/opt/tools/cloud/aws/aws_consoler/",desc:"Convert AWS CLI creds to console access",type:"github",cat:"cloud",tags:["aws","console","credentials","federation"]},
+    {name:"AWSPx",path:"/opt/tools/cloud/aws/awspx/",desc:"AWS attack path visualization",type:"github",cat:"cloud",tags:["aws","graph","visualization","attackpath"]},
+    {name:"CloudMapper",path:"/opt/tools/cloud/aws/cloudmapper/",desc:"AWS environment analysis and visualization",type:"github",cat:"cloud",tags:["aws","visualization","inventory","network"]},
+    {name:"Cloudsplaining",path:"/opt/tools/cloud/aws/cloudsplaining/",desc:"AWS IAM security assessment",type:"github",cat:"cloud",tags:["aws","iam","assessment","policy","risk"]},
+    {name:"Endgame",path:"/opt/tools/cloud/aws/endgame/",desc:"AWS resource exposure and backdoors",type:"github",cat:"cloud",tags:["aws","exposure","backdoor","persistence"]},
+    {name:"WeirdAAL",path:"/opt/tools/cloud/aws/weirdaal/",desc:"AWS attack library and enumeration",type:"github",cat:"cloud",tags:["aws","attack","enum","recon"]},
+    {name:"Azucar",path:"/opt/tools/cloud/azure/azucar/",desc:"Azure security scanner",type:"github",cat:"cloud",tags:["azure","scanner","security","audit"]},
+    {name:"AzureAD-Attack-Library",path:"/opt/tools/cloud/azure/azuread_attack_library/",desc:"Azure AD attack techniques reference",type:"github",cat:"cloud",tags:["azure","aad","attacks","reference"]},
+    {name:"Cartography",path:"/opt/tools/cloud/multi/cartography/",desc:"Multi-cloud infrastructure mapping",type:"github",cat:"cloud",tags:["multicloud","graph","neo4j","inventory"]},
+    {name:"Cloud-Enum",path:"/opt/tools/cloud/multi/cloud_enum/",desc:"Multi-cloud resource enumeration",type:"github",cat:"cloud",tags:["multicloud","enum","s3","azure","gcp"]},
+    {name:"Cloud-Detective",path:"/opt/tools/enumeration/recon/cloud_detective/",desc:"Cloud service detection from domains",type:"github",cat:"cloud",tags:["detection","domain","fingerprint"]},
+    {name:"GCP-Enum",path:"/opt/tools/cloud/gcp/gcp_enum/",desc:"GCP resource enumeration",type:"github",cat:"cloud",tags:["gcp","enum","projects","iam"]},
+    {name:"Hayat",path:"/opt/tools/cloud/gcp/hayat/",desc:"GCP privilege escalation scanner",type:"github",cat:"cloud",tags:["gcp","privesc","iam","scanner"]},
+    {name:"GCP-Scanner",path:"/opt/tools/cloud/gcp/gcp_scanner/",desc:"GCP security scanner - misconfigs, IAM issues",type:"github",cat:"cloud",tags:["gcp","scanner","security","misconfig","audit"]},
+    {name:"O365-Attack-Toolkit",path:"/opt/tools/cloud/o365/o365_attack_toolkit/",desc:"O365 attack automation",type:"github",cat:"cloud",tags:["o365","attack","phishing","token"]},
+    {name:"O365Enum",path:"/opt/tools/cloud/o365/o365enum/",desc:"O365 user enumeration",type:"github",cat:"cloud",tags:["o365","userenum","onedrive","sharepoint"]},
+    {name:"O365Recon",path:"/opt/tools/cloud/o365/o365recon/",desc:"O365 tenant reconnaissance",type:"github",cat:"cloud",tags:["o365","recon","tenant","domains"]},
+    {name:"TokenSmuggling",path:"/opt/tools/cloud/o365/tokensmuggling/",desc:"O365 token theft techniques",type:"github",cat:"cloud",tags:["o365","token","theft","prt"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // CONTAINERS
+    // ═══════════════════════════════════════════════════════════════
+    {name:"deepce",path:"/opt/tools/container/docker/deepce/",desc:"Docker enumeration and privilege escalation",type:"github",cat:"container",tags:["docker","escape","enumeration","privesc","socket","capabilities"]},
+    {name:"CDK",path:"/opt/tools/container/kubernetes/cdk/",desc:"Container/K8s pentest toolkit - escape, exploit, scan",type:"github",cat:"container",tags:["kubernetes","container","exploit","escape","docker","eks","aks","gke"]},
+    {name:"kube-hunter",path:"kube-hunter",desc:"K8s cluster vulnerability scanner",type:"pip",cat:"container",tags:["kubernetes","scanner","vuln","remote","cluster"]},
+    {name:"kubeletctl",path:"/opt/tools/container/kubernetes/kubeletctl/",desc:"Kubelet API interaction - exec, logs, scan",type:"github",cat:"container",tags:["kubernetes","kubelet","api","rce","pods"]},
+    {name:"Peirates",path:"/opt/tools/container/kubernetes/peirates/",desc:"K8s pentest - secrets, token, mount attacks",type:"github",cat:"container",tags:["kubernetes","pentest","secrets","token","serviceaccount"]},
+    {name:"kubeaudit",path:"/opt/tools/container/kubernetes/kubeaudit/",desc:"K8s cluster security audit",type:"github",cat:"container",tags:["kubernetes","audit","misconfig","rbac","securitycontext"]},
+    {name:"KDigger",path:"/opt/tools/container/kubernetes/kdigger/",desc:"K8s context and secrets enumeration",type:"github",cat:"container",tags:["kubernetes","enum","secrets","context","pod"]},
+    {name:"Trivy",path:"trivy",desc:"Container/filesystem vulnerability scanner",type:"apt",cat:"container",tags:["scanner","vulnerability","docker","sbom","iac"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // WEB & API
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Nuclei",path:"/opt/tools/enumeration/web/nuclei/",desc:"Template vuln scanner",type:"github",cat:"web",tags:["scanner","templates","cve"]},
+    {name:"Burp Suite",path:"burpsuite",desc:"Web proxy/scanner",type:"apt",cat:"web",tags:["proxy","scanner","intercept"]},
+    {name:"ZAP",path:"zaproxy",desc:"OWASP web scanner",type:"apt",cat:"web",tags:["proxy","scanner","owasp"]},
+    {name:"Caido",path:"caido",desc:"Lightweight web security auditing toolkit",type:"apt",cat:"web",tags:["proxy","scanner","intercept","modern","rust"]},
+    {name:"Feroxbuster",path:"feroxbuster",desc:"Fast content discovery",type:"apt",cat:"web",tags:["directory","bruteforce","fast"]},
+    {name:"Gobuster",path:"gobuster",desc:"Directory bruteforce",type:"apt",cat:"web",tags:["directory","bruteforce","dns","vhost"]},
+    {name:"Dirb",path:"dirb",desc:"Web content scanner",type:"apt",cat:"web",tags:["directory","bruteforce"]},
+    {name:"Dirsearch",path:"/opt/tools/enumeration/web/dirsearch/",desc:"Web path discovery",type:"github",cat:"web",tags:["directory","bruteforce"]},
+    {name:"ffuf",path:"ffuf",desc:"Fast fuzzer",type:"apt",cat:"web",tags:["fuzzing","directory","parameters"]},
+    {name:"wfuzz",path:"wfuzz",desc:"Web fuzzer",type:"apt",cat:"web",tags:["fuzzing","bruteforce"]},
+    {name:"Katana",path:"/opt/tools/enumeration/web/katana/",desc:"Web crawler",type:"github",cat:"web",tags:["crawler","spider"]},
+    {name:"Arjun",path:"/opt/tools/enumeration/recon/arjun/",desc:"HTTP param discovery",type:"github",cat:"web",tags:["parameters","fuzzing"]},
+    {name:"jwt_tool",path:"/opt/tools/enumeration/web/jwt_tool/",desc:"JWT testing",type:"github",cat:"web",tags:["jwt","token","auth"]},
+    {name:"SSRFmap",path:"/opt/tools/enumeration/web/ssrfmap/",desc:"SSRF exploitation",type:"github",cat:"web",tags:["ssrf","exploit"]},
+    {name:"STEWS",path:"/opt/tools/enumeration/web/stews/",desc:"WebSocket testing",type:"github",cat:"web",tags:["websocket"]},
+    {name:"SQLMap",path:"sqlmap",desc:"SQL injection",type:"apt",cat:"web",tags:["sqli","injection","database"]},
+    {name:"Commix",path:"commix",desc:"Command injection",type:"apt",cat:"web",tags:["command","injection","rce"]},
+    {name:"Nikto",path:"nikto",desc:"Web server scanner",type:"apt",cat:"web",tags:["scanner","webserver","cve"]},
+    {name:"WhatWeb",path:"whatweb",desc:"Web fingerprint",type:"apt",cat:"web",tags:["fingerprint","technology"]},
+    {name:"Wafw00f",path:"wafw00f",desc:"WAF detection",type:"apt",cat:"web",tags:["waf","detection","fingerprint"]},
+    {name:"WPScan",path:"wpscan",desc:"WordPress scanner",type:"apt",cat:"web",tags:["wordpress","scanner","cms"]},
+    {name:"CMSmap",path:"cmsmap",desc:"CMS scanner",type:"apt",cat:"web",tags:["cms","scanner","wordpress","joomla","drupal"]},
+    {name:"Droopescan",path:"droopescan",desc:"CMS scanner",type:"apt",cat:"web",tags:["cms","drupal","wordpress"]},
+    {name:"XSSer",path:"xsser",desc:"XSS exploitation",type:"apt",cat:"web",tags:["xss","injection"]},
+    {name:"Dalfox",path:"dalfox",desc:"XSS scanner",type:"apt",cat:"web",tags:["xss","scanner"]},
+    {name:"HTTPie",path:"httpie",desc:"HTTP client",type:"apt",cat:"web",tags:["http","client","api"]},
+    {name:"Curl",path:"curl",desc:"URL transfer",type:"apt",cat:"web",tags:["http","client","transfer"]},
+    {name:"Wget",path:"wget",desc:"File retrieval",type:"apt",cat:"web",tags:["http","download"]},
+    {name:"Cadaver",path:"cadaver",desc:"WebDAV command-line client",type:"apt",cat:"web",tags:["webdav","client","upload","download"]},
+    {name:"DAVTest",path:"davtest",desc:"WebDAV server testing and exploitation",type:"apt",cat:"web",tags:["webdav","upload","test","exploit"]},
+    {name:"Wapiti",path:"wapiti",desc:"Web application vulnerability scanner",type:"apt",cat:"web",tags:["scanner","vuln","injection","xss","sqli"]},
+    {name:"Skipfish",path:"skipfish",desc:"Active web app security recon",type:"apt",cat:"web",tags:["scanner","crawler","fuzzer","fast"]},
+    {name:"Weevely",path:"weevely",desc:"Stealth PHP web shell generator",type:"apt",cat:"web",tags:["webshell","php","backdoor","stealth"]},
+    {name:"Laudanum",path:"laudanum",desc:"Injectable web shell collection",type:"apt",cat:"web",tags:["webshell","asp","aspx","php","jsp"]},
+    {name:"EyeWitness",path:"eyewitness",desc:"Website screenshot and header capture",type:"apt",cat:"web",tags:["screenshot","recon","headers","report"]},
+    {name:"LBD",path:"lbd",desc:"Load balancer detector",type:"apt",cat:"web",tags:["loadbalancer","detection","dns","http"]},
+    {name:"Joomscan",path:"joomscan",desc:"Joomla vulnerability scanner",type:"apt",cat:"web",tags:["joomla","cms","scanner","vuln"]},
+    {name:"Plecost",path:"plecost",desc:"WordPress plugin/vuln fingerprinter",type:"apt",cat:"web",tags:["wordpress","plugin","fingerprint","vuln"]},
+    {name:"Parsero",path:"parsero",desc:"Robots.txt parser and analyzer",type:"apt",cat:"web",tags:["robots","disallow","recon","crawler"]},
+    {name:"Clusterd",path:"clusterd",desc:"Web application server fingerprint and exploit",type:"apt",cat:"web",tags:["jboss","tomcat","weblogic","coldfusion","exploit"]},
+    {name:"SSLyze",path:"sslyze",desc:"SSL/TLS configuration analyzer",type:"apt",cat:"web",tags:["ssl","tls","cipher","certificate","analysis"]},
+    {name:"Changeme",path:"changeme",desc:"Default credential scanner",type:"apt",cat:"web",tags:["default","credentials","passwords","scanner"]},
+    {name:"Default-credentials",path:"default-credentials",desc:"Default password database",type:"apt",cat:"web",tags:["default","passwords","database","lookup"]},
+    {name:"Cisco-auditing-tool",path:"cisco-auditing-tool",desc:"Cisco device security scanner",type:"apt",cat:"web",tags:["cisco","router","switch","audit"]},
+    {name:"DirBuster",path:"dirbuster",desc:"Directory bruteforce GUI (Java)",type:"apt",cat:"web",tags:["directory","bruteforce","gui","java"]},
+    {name:"Dmitry",path:"dmitry",desc:"Deepmagic Information Gathering Tool",type:"apt",cat:"web",tags:["whois","subdomain","email","tcp"]},
+    {name:"CutyCapt",path:"cutycapt",desc:"Webpage screenshot capture",type:"apt",cat:"web",tags:["screenshot","webpage","capture","webkit"]},
+    {name:"Spike",path:"spike",desc:"Protocol fuzzing framework",type:"apt",cat:"web",tags:["fuzzing","protocol","framework","buffer"]},
+    {name:"Inetsim",path:"inetsim",desc:"Internet services simulation",type:"apt",cat:"web",tags:["simulation","malware","sandbox","services"]},
+    {name:"QSSLcaudit",path:"qsslcaudit",desc:"SSL/TLS client testing",type:"apt",cat:"web",tags:["ssl","tls","client","audit","mitm"]},
+    {name:"Axel",path:"axel",desc:"Lightweight download accelerator",type:"apt",cat:"web",tags:["download","accelerator","parallel"]},
+    {name:"Web-Cache-Vulnerability-Scanner",path:"web-cache-vulnerability-scanner",desc:"Web cache poisoning/deception scanner",type:"apt",cat:"web",tags:["cache","poisoning","deception","cdn","proxy"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // NETWORK & SCANNING
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Nmap",path:"nmap",desc:"Network scanner",type:"apt",cat:"network",tags:["scanner","ports","services","nse"]},
+    {name:"Masscan",path:"masscan",desc:"Fast port scanner",type:"apt",cat:"network",tags:["scanner","ports","fast"]},
+    {name:"RustScan",path:"rustscan",desc:"Fast Nmap wrapper",type:"apt",cat:"network",tags:["scanner","ports","fast"]},
+    {name:"Netcat",path:"netcat-traditional",desc:"Network Swiss army knife",type:"apt",cat:"network",tags:["connect","listen","transfer"]},
+    {name:"Ncat",path:"ncat",desc:"Nmap netcat",type:"apt",cat:"network",tags:["connect","listen","ssl"]},
+    {name:"Hping3",path:"hping3",desc:"Packet crafter",type:"apt",cat:"network",tags:["packets","icmp","tcp","udp"]},
+    {name:"Arping",path:"arping",desc:"ARP ping",type:"apt",cat:"network",tags:["arp","ping","discovery"]},
+    {name:"Fping",path:"fping",desc:"Fast ping",type:"apt",cat:"network",tags:["ping","discovery","fast"]},
+    {name:"Netdiscover",path:"netdiscover",desc:"ARP scanner",type:"apt",cat:"network",tags:["arp","discovery","scanner"]},
+    {name:"NBTscan",path:"nbtscan",desc:"NetBIOS scanner",type:"apt",cat:"network",tags:["netbios","smb","discovery"]},
+    {name:"Unicornscan",path:"unicornscan",desc:"Port scanner",type:"apt",cat:"network",tags:["scanner","ports"]},
+    {name:"Zenmap",path:"zenmap",desc:"Nmap GUI",type:"apt",cat:"network",tags:["nmap","gui","scanner"]},
+    {name:"Wireshark",path:"wireshark",desc:"Packet analyzer",type:"apt",cat:"network",tags:["packets","capture","analysis"]},
+    {name:"Tshark",path:"tshark",desc:"Wireshark CLI",type:"apt",cat:"network",tags:["packets","capture","cli"]},
+    {name:"Tcpdump",path:"tcpdump",desc:"Packet capture",type:"apt",cat:"network",tags:["packets","capture","cli"]},
+    {name:"Termshark",path:"termshark",desc:"TUI Wireshark",type:"apt",cat:"network",tags:["packets","tui","analysis"]},
+    {name:"Tcpreplay",path:"tcpreplay",desc:"Replay pcap files on network",type:"apt",cat:"network",tags:["pcap","replay","traffic","inject"]},
+    {name:"DNSmap",path:"dnsmap",desc:"DNS subdomain bruteforce",type:"apt",cat:"network",tags:["dns","subdomain","bruteforce"]},
+    {name:"DNSchef",path:"dnschef",desc:"DNS proxy for spoofing/MITM",type:"apt",cat:"network",tags:["dns","proxy","spoof","mitm"]},
+    {name:"Onesixtyone",path:"onesixtyone",desc:"Fast SNMP community string scanner",type:"apt",cat:"network",tags:["snmp","scanner","community","fast"]},
+    {name:"SNMPcheck",path:"snmpcheck",desc:"SNMP device enumeration",type:"apt",cat:"network",tags:["snmp","enumeration","device"]},
+    {name:"SNMPwalk",path:"snmpwalk",desc:"SNMP MIB tree walker",type:"apt",cat:"network",tags:["snmp","mib","query","walk"]},
+    {name:"Yersinia",path:"yersinia",desc:"Layer 2 network attacks - STP/CDP/DHCP/DTP",type:"apt",cat:"network",tags:["layer2","stp","cdp","dhcp","vlan","dtp"]},
+    {name:"VoIPHopper",path:"voiphopper",desc:"VLAN hopping for VoIP networks",type:"apt",cat:"network",tags:["vlan","voip","hopping","cdp"]},
+    {name:"Swaks",path:"swaks",desc:"Swiss army knife for SMTP testing",type:"apt",cat:"network",tags:["smtp","email","test","relay"]},
+    {name:"SMTP-user-enum",path:"smtp-user-enum",desc:"Enumerate SMTP users via VRFY/EXPN/RCPT",type:"apt",cat:"network",tags:["smtp","userenum","vrfy","expn"]},
+    {name:"Polenum",path:"polenum",desc:"Windows password policy enumeration via RPC",type:"apt",cat:"network",tags:["windows","policy","password","rpc"]},
+    {name:"Arp-scan",path:"arp-scan",desc:"ARP scanner and fingerprinter",type:"apt",cat:"network",tags:["arp","scanner","fingerprint","mac"]},
+    {name:"Ike-scan",path:"ike-scan",desc:"IPsec VPN scanner and fingerprinter",type:"apt",cat:"network",tags:["ipsec","vpn","scanner","ike"]},
+    {name:"Ngrep",path:"ngrep",desc:"Network grep - packet pattern matching",type:"apt",cat:"network",tags:["grep","packets","search","filter"]},
+    {name:"Netsed",path:"netsed",desc:"Network stream editor",type:"apt",cat:"network",tags:["stream","edit","replace","inject"]},
+    {name:"Tcpick",path:"tcpick",desc:"TCP stream sniffer and reassembler",type:"apt",cat:"network",tags:["tcp","stream","reassemble","sniff"]},
+    {name:"THC-IPv6",path:"thc-ipv6",desc:"IPv6 attack toolkit",type:"apt",cat:"network",tags:["ipv6","attack","dos","mitm","ra"]},
+    {name:"Iodine",path:"iodine",desc:"DNS tunnel for IPv4 over DNS",type:"apt",cat:"network",tags:["dns","tunnel","firewall","bypass"]},
+    {name:"DNS2tcp",path:"dns2tcp",desc:"TCP over DNS tunnel",type:"apt",cat:"network",tags:["dns","tunnel","tcp","bypass"]},
+    {name:"Vlan",path:"vlan",desc:"VLAN configuration tools",type:"apt",cat:"network",tags:["vlan","802.1q","tagging"]},
+    {name:"Nipper-ng",path:"nipper-ng",desc:"Network device config security auditor",type:"apt",cat:"network",tags:["cisco","config","audit","security","router","firewall"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // WIRELESS
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Aircrack-ng",path:"aircrack-ng",desc:"WiFi security suite",type:"apt",cat:"wireless",tags:["wifi","wpa","wep","crack","capture"]},
+    {name:"Airmon-ng",path:"aircrack-ng",desc:"Monitor mode",type:"apt",cat:"wireless",tags:["wifi","monitor","interface"]},
+    {name:"Airodump-ng",path:"aircrack-ng",desc:"WiFi capture",type:"apt",cat:"wireless",tags:["wifi","capture","scan"]},
+    {name:"Aireplay-ng",path:"aircrack-ng",desc:"WiFi injection",type:"apt",cat:"wireless",tags:["wifi","injection","deauth"]},
+    {name:"Reaver",path:"reaver",desc:"WPS attack",type:"apt",cat:"wireless",tags:["wps","bruteforce","wifi"]},
+    {name:"Bully",path:"bully",desc:"WPS bruteforce",type:"apt",cat:"wireless",tags:["wps","bruteforce","wifi"]},
+    {name:"Pixiewps",path:"pixiewps",desc:"WPS pixie dust",type:"apt",cat:"wireless",tags:["wps","pixiedust","wifi"]},
+    {name:"Wifite",path:"wifite",desc:"Auto WiFi attack",type:"apt",cat:"wireless",tags:["wifi","automated","wpa","wps"]},
+    {name:"Kismet",path:"kismet",desc:"Wireless detector",type:"apt",cat:"wireless",tags:["wifi","bluetooth","detection","scanner"]},
+    {name:"Fern WiFi Cracker",path:"fern-wifi-cracker",desc:"WiFi GUI tool",type:"apt",cat:"wireless",tags:["wifi","gui","wpa","wep"]},
+    {name:"Hostapd-wpe",path:"hostapd-wpe",desc:"Rogue AP",type:"apt",cat:"wireless",tags:["wifi","rogue","ap","eap"]},
+    {name:"Wifiphisher",path:"wifiphisher",desc:"WiFi phishing",type:"apt",cat:"wireless",tags:["wifi","phishing","rogue"]},
+    {name:"Bettercap",path:"bettercap",desc:"Network attack framework",type:"apt",cat:"wireless",tags:["mitm","wifi","bluetooth","arp"]},
+    {name:"Bluez",path:"bluez",desc:"Bluetooth stack",type:"apt",cat:"wireless",tags:["bluetooth","tools"]},
+    {name:"Bluesnarfer",path:"bluesnarfer",desc:"Bluetooth attack",type:"apt",cat:"wireless",tags:["bluetooth","attack"]},
+    {name:"Ubertooth",path:"ubertooth",desc:"Bluetooth sniffer",type:"apt",cat:"wireless",tags:["bluetooth","sniff","capture"]},
+    {name:"Hcxdumptool",path:"hcxdumptool",desc:"Capture WPA/WPA2 PMKID and handshakes",type:"apt",cat:"wireless",tags:["wifi","wpa","pmkid","handshake","capture"]},
+    {name:"Hcxpcapngtool",path:"hcxpcapngtool",desc:"Convert captures to hashcat format",type:"apt",cat:"wireless",tags:["wifi","convert","hashcat","pmkid"]},
+    {name:"GNURadio",path:"gnuradio",desc:"Software defined radio framework",type:"apt",cat:"wireless",tags:["sdr","radio","dsp","signal"]},
+    {name:"GQRX",path:"gqrx-sdr",desc:"SDR receiver GUI",type:"apt",cat:"wireless",tags:["sdr","receiver","gui","spectrum"]},
+    {name:"HackRF",path:"hackrf",desc:"HackRF One SDR tools",type:"apt",cat:"wireless",tags:["sdr","hackrf","transmit","receive"]},
+    {name:"Gr-osmosdr",path:"gr-osmosdr",desc:"GNU Radio SDR source blocks",type:"apt",cat:"wireless",tags:["sdr","gnuradio","rtlsdr","hackrf"]},
+    {name:"Kalibrate-rtl",path:"kalibrate-rtl",desc:"GSM frequency calibration",type:"apt",cat:"wireless",tags:["gsm","calibration","rtlsdr","frequency"]},
+    {name:"Multimon-ng",path:"multimon-ng",desc:"Digital transmission decoder",type:"apt",cat:"wireless",tags:["decoder","pager","dtmf","pocsag","flex"]},
+    {name:"Inspectrum",path:"inspectrum",desc:"SDR signal analyzer",type:"apt",cat:"wireless",tags:["sdr","signal","analyzer","waterfall"]},
+    {name:"Chirp",path:"chirp",desc:"Radio programming tool",type:"apt",cat:"wireless",tags:["radio","programming","ham","frequencies"]},
+    {name:"Multimac",path:"multimac",desc:"Multiple MAC address interface",type:"apt",cat:"wireless",tags:["mac","multiple","interface","spoof"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // PASSWORDS & CRACKING
+    // ═══════════════════════════════════════════════════════════════
+    {name:"John",path:"john",desc:"Password cracker",type:"apt",cat:"passwords",tags:["crack","hash","wordlist","rules"]},
+    {name:"Hashcat",path:"hashcat",desc:"GPU password cracker",type:"apt",cat:"passwords",tags:["crack","hash","gpu","rules"]},
+    {name:"Hydra",path:"hydra",desc:"Online bruteforce",type:"apt",cat:"passwords",tags:["bruteforce","online","ssh","ftp","http"]},
+    {name:"Medusa",path:"medusa",desc:"Parallel bruteforce",type:"apt",cat:"passwords",tags:["bruteforce","online","parallel"]},
+    {name:"Ncrack",path:"ncrack",desc:"Network auth cracker",type:"apt",cat:"passwords",tags:["bruteforce","online","ssh","rdp"]},
+    {name:"CeWL",path:"cewl",desc:"Custom wordlist generator",type:"apt",cat:"passwords",tags:["wordlist","crawl","custom"]},
+    {name:"Crunch",path:"crunch",desc:"Wordlist generator",type:"apt",cat:"passwords",tags:["wordlist","generate","pattern"]},
+    {name:"CUPP",path:"cupp",desc:"Profile wordlist",type:"apt",cat:"passwords",tags:["wordlist","profile","custom"]},
+    {name:"Hashid",path:"hashid",desc:"Hash identifier",type:"apt",cat:"passwords",tags:["hash","identify"]},
+    {name:"Hash-identifier",path:"hash-identifier",desc:"Hash identifier",type:"apt",cat:"passwords",tags:["hash","identify"]},
+    {name:"Ophcrack",path:"ophcrack",desc:"Windows password cracker",type:"apt",cat:"passwords",tags:["windows","crack","rainbow"]},
+    {name:"Wordlists",path:"wordlists",desc:"Wordlist collection",type:"apt",cat:"passwords",tags:["wordlist","rockyou","seclists"]},
+    {name:"Seclists",path:"seclists",desc:"Security wordlists",type:"apt",cat:"passwords",tags:["wordlist","fuzzing","passwords"]},
+    {name:"Patator",path:"patator",desc:"Multi-purpose brute-forcer - SSH/FTP/HTTP/SMB/LDAP",type:"apt",cat:"passwords",tags:["bruteforce","modular","ssh","ftp","http","smb"]},
+    {name:"Pipal",path:"pipal",desc:"Password statistics and analysis tool",type:"apt",cat:"passwords",tags:["analysis","statistics","policy","patterns"]},
+    {name:"Chntpw",path:"chntpw",desc:"Windows SAM password reset/edit offline",type:"apt",cat:"passwords",tags:["windows","sam","reset","offline","registry"]},
+    {name:"RSMangler",path:"rsmangler",desc:"Wordlist mangling and permutation",type:"apt",cat:"passwords",tags:["wordlist","mangle","permute","custom"]},
+    {name:"WCE",path:"wce",desc:"Windows Credentials Editor - hash dump/inject",type:"apt",cat:"passwords",tags:["windows","credentials","hash","pth","inject"]},
+    {name:"Hashcat-utils",path:"hashcat-utils",desc:"Hashcat utility tools - combinator, rules",type:"apt",cat:"passwords",tags:["hashcat","rules","combine","masks"]},
+    {name:"Maskprocessor",path:"maskprocessor",desc:"Hashcat mask generator",type:"apt",cat:"passwords",tags:["hashcat","masks","wordlist","generate"]},
+    {name:"Statsprocessor",path:"statsprocessor",desc:"Password pattern statistics",type:"apt",cat:"passwords",tags:["statistics","patterns","analysis","hashcat"]},
+    {name:"Hashdeep",path:"hashdeep",desc:"Recursive hash computation and audit",type:"apt",cat:"passwords",tags:["hash","recursive","audit","verify"]},
+    {name:"GPP-decrypt",path:"gpp-decrypt",desc:"Decrypt Group Policy Preferences cpassword",type:"apt",cat:"passwords",tags:["gpp","cpassword","decrypt","sysvol"]},
+    {name:"Passing-the-hash",path:"passing-the-hash",desc:"Pass-the-hash toolkit",type:"apt",cat:"passwords",tags:["pth","ntlm","pass","hash"]},
+    {name:"Samdump2",path:"samdump2",desc:"Dump Windows SAM password hashes",type:"apt",cat:"passwords",tags:["sam","dump","windows","offline"]},
+    {name:"Creddump7",path:"creddump7",desc:"Windows credential cache dumper",type:"apt",cat:"passwords",tags:["credentials","cache","windows","lsa"]},
+    {name:"Name-That-Hash",path:"name-that-hash",desc:"Hash type identifier - detects 300+ hash types",type:"apt",cat:"passwords",tags:["hash","identify","detect","type","format"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // REVERSE ENGINEERING
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Ghidra",path:"ghidra",desc:"NSA RE framework",type:"apt",cat:"re",tags:["decompiler","disassembler","analysis"]},
+    {name:"Radare2",path:"radare2",desc:"RE framework",type:"apt",cat:"re",tags:["disassembler","debugger","analysis"]},
+    {name:"GEF",path:"gef",desc:"GDB Enhanced Features",type:"apt",cat:"re",tags:["gdb","debugger","exploit","heap"]},
+    {name:"pwntools",path:"python3-pwntools",desc:"CTF/exploit framework",type:"apt",cat:"re",tags:["exploit","ctf","rop","shellcode"]},
+    {name:"GDB",path:"gdb",desc:"GNU Debugger",type:"apt",cat:"re",tags:["debugger","breakpoints"]},
+    {name:"Strace",path:"strace",desc:"System call tracer",type:"apt",cat:"re",tags:["syscall","trace","debug"]},
+    {name:"Ltrace",path:"ltrace",desc:"Library call tracer",type:"apt",cat:"re",tags:["library","trace","debug"]},
+    {name:"Objdump",path:"binutils",desc:"Object file dumper",type:"apt",cat:"re",tags:["disassembly","elf","pe"]},
+    {name:"Readelf",path:"binutils",desc:"ELF reader",type:"apt",cat:"re",tags:["elf","headers","sections"]},
+    {name:"Strings",path:"binutils",desc:"Extract strings",type:"apt",cat:"re",tags:["strings","binary"]},
+    {name:"File",path:"file",desc:"File type detection",type:"apt",cat:"re",tags:["filetype","magic"]},
+    {name:"ROPgadget",path:"ROPgadget",desc:"ROP gadget finder",type:"pip",cat:"re",tags:["rop","gadgets","exploit"]},
+    {name:"Ropper",path:"ropper",desc:"ROP/JOP gadgets",type:"pip",cat:"re",tags:["rop","jop","gadgets"]},
+    {name:"one_gadget",path:"one_gadget",desc:"One-shot RCE in libc",type:"gem",cat:"re",tags:["libc","oneshot"]},
+    {name:"seccomp-tools",path:"seccomp-tools",desc:"Seccomp analyzer",type:"gem",cat:"re",tags:["seccomp","sandbox"]},
+    {name:"angr",path:"angr",desc:"Symbolic execution",type:"pip",cat:"re",tags:["symbolic","analysis"]},
+    {name:"Qiling",path:"qiling",desc:"Binary emulation",type:"pip",cat:"re",tags:["emulation","multiarch"]},
+    {name:"Capstone",path:"python3-capstone",desc:"Disassembly framework",type:"apt",cat:"re",tags:["disassembly","x86","arm"]},
+    {name:"Keystone",path:"python3-keystone",desc:"Assembler framework",type:"apt",cat:"re",tags:["assembler","x86","arm"]},
+    {name:"Unicorn",path:"python3-unicorn",desc:"CPU emulator",type:"apt",cat:"re",tags:["emulator","x86","arm"]},
+    {name:"JADX",path:"jadx",desc:"Android decompiler",type:"apt",cat:"re",tags:["android","decompiler","java"]},
+    {name:"Apktool",path:"apktool",desc:"APK RE tool",type:"apt",cat:"re",tags:["android","apk","decompile"]},
+    {name:"Dex2jar",path:"dex2jar",desc:"DEX to JAR",type:"apt",cat:"re",tags:["android","dex","jar"]},
+    {name:"JD-GUI",path:"jd-gui",desc:"Java decompiler",type:"apt",cat:"re",tags:["java","decompiler"]},
+    {name:"Checksec",path:"checksec",desc:"Binary protections",type:"apt",cat:"re",tags:["nx","pie","canary","relro"]},
+    {name:"Patchelf",path:"patchelf",desc:"ELF patcher",type:"apt",cat:"re",tags:["elf","patch","rpath"]},
+    {name:"NASM",path:"nasm",desc:"Netwide Assembler for x86/x64",type:"apt",cat:"re",tags:["assembler","x86","x64","shellcode"]},
+    {name:"ByteCode-Viewer",path:"/opt/tools/windows/re/bytecode_viewer/",desc:"Java/Android/Python decompiler",type:"github",cat:"re",tags:["java","android","decompiler","bytecode"]},
+    {name:"Simplify",path:"/opt/tools/windows/re/simplify/",desc:"Android deobfuscator",type:"github",cat:"re",tags:["android","deobfuscate","dex","smali"]},
+    {name:"BugChecker",path:"/opt/tools/windows/re/bugchecker/",desc:"Windows kernel debugger",type:"github",cat:"re",tags:["kernel","debug","windows","driver"]},
+    {name:"EDB-Debugger",path:"edb-debugger",desc:"Linux debugger (OllyDbg-like)",type:"apt",cat:"re",tags:["debugger","linux","gui","ollydbg"]},
+    {name:"UPX",path:"upx-ucl",desc:"Executable packer/unpacker",type:"apt",cat:"re",tags:["packer","unpacker","compress","exe"]},
+    {name:"Ncurses-hexedit",path:"ncurses-hexedit",desc:"Hex editor TUI",type:"apt",cat:"re",tags:["hex","editor","tui","binary"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // FORENSICS
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Volatility3",path:"volatility3",desc:"Memory forensics",type:"pip",cat:"forensics",tags:["memory","analysis","windows","linux"]},
+    {name:"AVML",path:"/opt/tools/forensics/memory/avml/",desc:"Linux memory acquisition",type:"github",cat:"forensics",tags:["memory","acquisition","linux"]},
+    {name:"LiME",path:"/opt/tools/forensics/memory/lime/",desc:"Linux Memory Extractor",type:"github",cat:"forensics",tags:["memory","kernel","module"]},
+    {name:"Autopsy",path:"autopsy",desc:"Digital forensics platform",type:"apt",cat:"forensics",tags:["disk","analysis","gui"]},
+    {name:"Sleuthkit",path:"sleuthkit",desc:"Disk forensics",type:"apt",cat:"forensics",tags:["disk","filesystem","analysis"]},
+    {name:"Foremost",path:"foremost",desc:"File carving",type:"apt",cat:"forensics",tags:["carving","recovery"]},
+    {name:"Scalpel",path:"scalpel",desc:"File carving",type:"apt",cat:"forensics",tags:["carving","recovery"]},
+    {name:"Binwalk",path:"binwalk",desc:"Firmware analysis",type:"apt",cat:"forensics",tags:["firmware","extraction","analysis"]},
+    {name:"Bulk-extractor",path:"bulk-extractor",desc:"Extract artifacts",type:"apt",cat:"forensics",tags:["extraction","email","urls"]},
+    {name:"Dc3dd",path:"dc3dd",desc:"Forensic dd",type:"apt",cat:"forensics",tags:["imaging","dd","forensic"]},
+    {name:"Dcfldd",path:"dcfldd",desc:"Enhanced dd",type:"apt",cat:"forensics",tags:["imaging","dd","hash"]},
+    {name:"Exiftool",path:"exiftool",desc:"Metadata reader",type:"apt",cat:"forensics",tags:["metadata","exif","images"]},
+    {name:"Steghide",path:"steghide",desc:"Steganography",type:"apt",cat:"forensics",tags:["stego","hide","extract"]},
+    {name:"Stegseek",path:"stegseek",desc:"Fast steghide cracker",type:"apt",cat:"forensics",tags:["stego","crack","fast"]},
+    {name:"Zsteg",path:"zsteg",desc:"PNG/BMP stego",type:"apt",cat:"forensics",tags:["stego","png","bmp"]},
+    {name:"Pdfparser",path:"pdfparser",desc:"PDF analysis",type:"apt",cat:"forensics",tags:["pdf","analysis","malware"]},
+    {name:"Oletools",path:"python3-oletools",desc:"MS Office analysis",type:"apt",cat:"forensics",tags:["office","macros","vba"]},
+    {name:"Yara",path:"yara",desc:"Pattern matching",type:"apt",cat:"forensics",tags:["rules","malware","detection"]},
+    {name:"Guymager",path:"guymager",desc:"Forensic disk imaging with GUI",type:"apt",cat:"forensics",tags:["imaging","disk","forensic","gui","dd"]},
+    {name:"Magicrescue",path:"magicrescue",desc:"Recover files by magic bytes",type:"apt",cat:"forensics",tags:["recovery","carving","magic","deleted"]},
+    {name:"Pdfid",path:"pdfid",desc:"PDF malware triage scanner",type:"apt",cat:"forensics",tags:["pdf","malware","javascript","triage"]},
+    {name:"Dwarf2json",path:"/opt/tools/forensics/memory/dwarf2json/",desc:"Generate Volatility Linux profiles",type:"github",cat:"forensics",tags:["volatility","profile","linux","dwarf"]},
+    {name:"Volatility-Profiles",path:"/opt/tools/forensics/memory/volatility_profiles/",desc:"Pre-built Volatility profiles",type:"github",cat:"forensics",tags:["volatility","profiles","windows","linux"]},
+    {name:"Testdisk",path:"testdisk",desc:"Partition recovery and repair",type:"apt",cat:"forensics",tags:["partition","recovery","repair","mbr","gpt"]},
+    {name:"Photorec",path:"photorec",desc:"File recovery from disk images",type:"apt",cat:"forensics",tags:["recovery","carving","photos","files"]},
+    {name:"Reged",path:"reged",desc:"Windows registry editor (offline)",type:"apt",cat:"forensics",tags:["registry","windows","offline","edit"]},
+    {name:"Gparted",path:"gparted",desc:"Partition editor GUI",type:"apt",cat:"forensics",tags:["partition","disk","gui","resize"]},
+    {name:"Scrounge-ntfs",path:"scrounge-ntfs",desc:"NTFS data recovery",type:"apt",cat:"forensics",tags:["ntfs","recovery","data","undelete"]},
+    {name:"Cryptsetup",path:"cryptsetup",desc:"LUKS disk encryption",type:"apt",cat:"forensics",tags:["luks","encryption","disk","decrypt"]},
+    {name:"Exiv2",path:"exiv2",desc:"EXIF/IPTC/XMP metadata tool",type:"apt",cat:"forensics",tags:["exif","metadata","images","xmp"]},
+    {name:"PDF-parser",path:"pdf-parser",desc:"PDF document analyzer",type:"apt",cat:"forensics",tags:["pdf","parser","analysis","streams"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // EMBEDDED & IoT
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Firmwalker",path:"/opt/tools/embedded/firmware/firmwalker/",desc:"Firmware analysis",type:"github",cat:"embedded",tags:["firmware","secrets"]},
+    {name:"Firmadyne",path:"/opt/tools/embedded/firmware/firmadyne/",desc:"Firmware emulation",type:"github",cat:"embedded",tags:["firmware","emulation"]},
+    {name:"RouterSploit",path:"/opt/tools/embedded/iot/routersploit/",desc:"Router exploitation",type:"github",cat:"embedded",tags:["router","iot","exploit"]},
+    {name:"Frida",path:"frida-tools",desc:"Dynamic instrumentation",type:"pip",cat:"embedded",tags:["instrumentation","hooking","mobile"]},
+    {name:"Objection",path:"objection",desc:"Mobile runtime exploration",type:"pip",cat:"embedded",tags:["mobile","android","ios"]},
+    {name:"OpenOCD",path:"openocd",desc:"JTAG/SWD debugger",type:"apt",cat:"embedded",tags:["jtag","swd","debug"]},
+    {name:"Flashrom",path:"flashrom",desc:"Flash chip programmer",type:"apt",cat:"embedded",tags:["flash","spi","chip"]},
+    {name:"Can-utils",path:"can-utils",desc:"CAN bus tools",type:"apt",cat:"embedded",tags:["can","automotive","bus"]},
+    {name:"Minicom",path:"minicom",desc:"Serial terminal",type:"apt",cat:"embedded",tags:["serial","uart","terminal"]},
+    {name:"Screen",path:"screen",desc:"Terminal multiplexer",type:"apt",cat:"embedded",tags:["serial","terminal"]},
+    {name:"Firmware-Analysis-Toolkit",path:"/opt/tools/embedded/firmware/firmware_analysis_toolkit/",desc:"Automated firmware analysis",type:"github",cat:"embedded",tags:["firmware","analysis","automated","emulation"]},
+    {name:"Firmware-Mod-Kit",path:"/opt/tools/embedded/firmware/firmware_mod_kit/",desc:"Firmware extraction and modification",type:"github",cat:"embedded",tags:["firmware","extract","modify","rebuild"]},
+    {name:"Sasquatch",path:"/opt/tools/embedded/firmware/sasquatch/",desc:"SquashFS extraction with vendor patches",type:"github",cat:"embedded",tags:["squashfs","extract","firmware","vendor"]},
+    {name:"ExplIoT",path:"/opt/tools/embedded/iot/expliot/",desc:"IoT exploitation framework",type:"github",cat:"embedded",tags:["iot","framework","protocols","exploit"]},
+    {name:"I2C-tools",path:"i2c-tools",desc:"I2C bus tools",type:"apt",cat:"embedded",tags:["i2c","bus","hardware","debug"]},
+    {name:"Proxmark3",path:"proxmark3",desc:"RFID research and security tool",type:"apt",cat:"embedded",tags:["rfid","nfc","mifare","hid","clone","emulate"]},
+    {name:"RFDump",path:"rfdump",desc:"RFID tag data decoder",type:"apt",cat:"embedded",tags:["rfid","decode","tag","reader"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // EVASION
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Defendnot",path:"/opt/tools/windows/evasion/defendnot/",desc:"Disable Windows Defender via WSC registration",type:"github",cat:"evasion",tags:["defender","disable","av","wsc","tamper"]},
+    {name:"NyxInvoke",path:"/opt/tools/windows/evasion/nyxinvoke/",desc:"Evasive .NET assembly loader - AMSI/ETW bypass",type:"github",cat:"evasion",tags:["dotnet","loader","amsi","etw","bypass","assembly"]},
+    {name:"BOAZ",path:"/opt/tools/windows/evasion/boaz/",desc:"AV/EDR evasion shellcode loader generator",type:"github",cat:"evasion",tags:["av","edr","bypass","shellcode","loader","unhook"]},
+    {name:"Supernova",path:"/opt/tools/windows/evasion/supernova/",desc:"Shellcode encryptor with multiple ciphers",type:"github",cat:"evasion",tags:["shellcode","encryption","xor","aes","rc4"]},
+    {name:"Veil",path:"veil",desc:"AV evasion payload generator - Python/C/PS",type:"apt",cat:"evasion",tags:["payload","av","bypass","meterpreter","python","csharp"]},
+    {name:"Shellter",path:"shellter",desc:"Dynamic PE infector for AV bypass",type:"apt",cat:"evasion",tags:["pe","inject","av","backdoor","legitimate"]},
+    {name:"BypassAV",path:"/opt/tools/windows/evasion/bypassav/",desc:"AV bypass techniques collection",type:"github",cat:"evasion",tags:["av","bypass","techniques","collection"]},
+    {name:"Loki",path:"/opt/tools/windows/evasion/loki/",desc:"AMSI/ETW/CLM bypass loader",type:"github",cat:"evasion",tags:["amsi","etw","clm","bypass","loader"]},
+    {name:"NoPowerShell",path:"/opt/tools/windows/evasion/nopowershell/",desc:"PowerShell without powershell.exe",type:"github",cat:"evasion",tags:["powershell","bypass","constrained","clm"]},
+    {name:"OffensiveVBA",path:"/opt/tools/windows/evasion/offensivevba/",desc:"VBA macro offensive techniques",type:"github",cat:"evasion",tags:["vba","macro","office","payload"]},
+    {name:"PS-Obfuscation",path:"/opt/tools/windows/evasion/ps_obfuscation/",desc:"PowerShell obfuscation techniques",type:"github",cat:"evasion",tags:["powershell","obfuscation","amsi","bypass"]},
+    {name:"Shellcode2DLL",path:"/opt/tools/windows/evasion/shellcode2dll/",desc:"Convert shellcode to DLL",type:"github",cat:"evasion",tags:["shellcode","dll","convert","loader"]},
+    {name:"Evilginx2",path:"/opt/tools/windows/evasion/evilginx2/",desc:"MITM phishing framework for MFA bypass",type:"github",cat:"evasion",tags:["phishing","mfa","2fa","mitm","session"]},
+    {name:"Donut",path:"donut",desc:"Shellcode generator for .NET/VBS/JS/XSL payloads",type:"apt",cat:"evasion",tags:["shellcode","dotnet","vbs","js","position-independent"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // RECON & OSINT
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Amass",path:"amass",desc:"Subdomain enumeration",type:"apt",cat:"recon",tags:["subdomain","dns","enumeration"]},
+    {name:"Subfinder",path:"/opt/tools/enumeration/web/subfinder/",desc:"Subdomain discovery",type:"github",cat:"recon",tags:["subdomain","passive"]},
+    {name:"Sublist3r",path:"sublist3r",desc:"Subdomain enum",type:"apt",cat:"recon",tags:["subdomain","enumeration"]},
+    {name:"Fierce",path:"fierce",desc:"DNS recon",type:"apt",cat:"recon",tags:["dns","enumeration"]},
+    {name:"DNSenum",path:"dnsenum",desc:"DNS enumeration",type:"apt",cat:"recon",tags:["dns","enumeration","zone"]},
+    {name:"DNSrecon",path:"dnsrecon",desc:"DNS recon",type:"apt",cat:"recon",tags:["dns","enumeration","zone"]},
+    {name:"DNSx",path:"/opt/tools/enumeration/web/dnsx/",desc:"DNS toolkit",type:"github",cat:"recon",tags:["dns","resolver"]},
+    {name:"TheHarvester",path:"theharvester",desc:"Email/subdomain harvester",type:"apt",cat:"recon",tags:["email","subdomain","osint"]},
+    {name:"Recon-ng",path:"recon-ng",desc:"Recon framework",type:"apt",cat:"recon",tags:["osint","framework"]},
+    {name:"SpiderFoot",path:"spiderfoot",desc:"OSINT automation",type:"apt",cat:"recon",tags:["osint","automation"]},
+    {name:"Maltego",path:"maltego",desc:"Visual link analysis",type:"apt",cat:"recon",tags:["osint","graph","visualization"]},
+    {name:"Shodan",path:"shodan",desc:"Shodan CLI",type:"apt",cat:"recon",tags:["shodan","iot","search"]},
+    {name:"Whois",path:"whois",desc:"Domain lookup",type:"apt",cat:"recon",tags:["domain","whois","lookup"]},
+    {name:"Dig",path:"dnsutils",desc:"DNS lookup",type:"apt",cat:"recon",tags:["dns","query","lookup"]},
+    {name:"Host",path:"dnsutils",desc:"DNS lookup",type:"apt",cat:"recon",tags:["dns","query"]},
+    {name:"Nslookup",path:"dnsutils",desc:"DNS query",type:"apt",cat:"recon",tags:["dns","query"]},
+    {name:"Wafw00f",path:"wafw00f",desc:"WAF fingerprint",type:"apt",cat:"recon",tags:["waf","detection"]},
+    {name:"Sherlock",path:"sherlock",desc:"Username search across social networks",type:"apt",cat:"recon",tags:["username","social","osint","hunt"]},
+    {name:"Holehe",path:"holehe",desc:"Check email registration on sites",type:"apt",cat:"recon",tags:["email","osint","registration","breach"]},
+    {name:"PhoneInfoga",path:"phoneinfoga",desc:"Phone number OSINT gathering",type:"apt",cat:"recon",tags:["phone","osint","lookup"]},
+    {name:"Mosint",path:"mosint",desc:"Email OSINT tool",type:"apt",cat:"recon",tags:["email","osint","breach","social"]},
+    {name:"Crosslinked",path:"crosslinked",desc:"LinkedIn employee enumeration",type:"apt",cat:"recon",tags:["linkedin","employees","osint","spray"]},
+    {name:"LinkedIn2Username",path:"linkedin2username",desc:"Generate usernames from LinkedIn",type:"apt",cat:"recon",tags:["linkedin","username","generation","spray"]},
+    {name:"GitTools",path:"gittools",desc:"Git repo dumper and extractor",type:"apt",cat:"recon",tags:["git","dump","exposed","extract"]},
+    {name:"Gitleaks",path:"gitleaks",desc:"Find secrets in git repos",type:"apt",cat:"recon",tags:["git","secrets","keys","passwords","scan"]},
+    {name:"Detect-secrets",path:"detect-secrets",desc:"Enterprise secrets detection in code",type:"apt",cat:"recon",tags:["secrets","keys","tokens","scan"]},
+    {name:"Secretscanner",path:"secretscanner",desc:"Find secrets in code/files",type:"apt",cat:"recon",tags:["secrets","scan","api","keys"]},
+    {name:"Gau",path:"/opt/tools/enumeration/recon/gau/",desc:"Get All URLs from web archives",type:"github",cat:"recon",tags:["urls","wayback","archive","crawl"]},
+    {name:"Hakrawler",path:"/opt/tools/enumeration/recon/hakrawler/",desc:"Fast web crawler for endpoints",type:"github",cat:"recon",tags:["crawler","endpoints","js","links"]},
+    {name:"ParamSpider",path:"/opt/tools/enumeration/recon/paramspider/",desc:"URL parameter discovery from archives",type:"github",cat:"recon",tags:["parameters","wayback","fuzzing"]},
+    {name:"WaybackURLs",path:"/opt/tools/enumeration/recon/waybackurls/",desc:"Fetch URLs from Wayback Machine",type:"github",cat:"recon",tags:["wayback","urls","archive","history"]},
+    {name:"Naabu",path:"/opt/tools/enumeration/web/naabu/",desc:"Fast port scanner in Go",type:"github",cat:"recon",tags:["ports","scanner","fast","go"]},
+    {name:"Race-the-web",path:"/opt/tools/enumeration/web/race_the_web/",desc:"Race condition testing tool",type:"github",cat:"recon",tags:["race","condition","concurrency","timing"]},
+    {name:"Gospider",path:"gospider",desc:"Fast web spider for crawling and link extraction",type:"apt",cat:"recon",tags:["crawler","spider","links","sitemap","robots"]},
+    {name:"BloodyAD",path:"bloodyad",desc:"AD privilege escalation via LDAP",type:"apt",cat:"recon",tags:["ad","ldap","privesc","acl","bloodhound"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // EXPLOITATION FRAMEWORKS
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Metasploit",path:"metasploit-framework",desc:"Exploitation framework",type:"apt",cat:"exploit",tags:["exploit","payload","meterpreter","post"]},
+    {name:"Searchsploit",path:"exploitdb",desc:"Exploit database",type:"apt",cat:"exploit",tags:["exploit","cve","search"]},
+    {name:"SET",path:"set",desc:"Social Engineering Toolkit",type:"apt",cat:"exploit",tags:["social","phishing","payload"]},
+    {name:"BeEF",path:"beef-xss",desc:"Browser exploitation",type:"apt",cat:"exploit",tags:["browser","xss","hook"]},
+    {name:"MSFvenom",path:"metasploit-framework",desc:"Payload generator",type:"apt",cat:"exploit",tags:["payload","shellcode","encoder"]},
+    {name:"SET",path:"setoolkit",desc:"Social Engineering Toolkit - phishing, payloads",type:"apt",cat:"exploit",tags:["social","phishing","payload","clone","harvest"]},
+    {name:"Nishang",path:"nishang",desc:"PowerShell offensive scripts collection",type:"apt",cat:"exploit",tags:["powershell","shells","escalation","exfiltration"]},
+    {name:"THC-PPTP-Bruter",path:"thc-pptp-bruter",desc:"PPTP VPN brute-forcer",type:"apt",cat:"exploit",tags:["pptp","vpn","bruteforce"]},
+    {name:"SQLMapCG",path:"/opt/tools/linux/exploit/sqlmapcg/",desc:"SQLMap with extra features",type:"github",cat:"exploit",tags:["sqli","injection","database","enhanced"]},
+    {name:"WebCrack",path:"/opt/tools/linux/exploit/webcrack/",desc:"Web login brute-forcer",type:"github",cat:"exploit",tags:["bruteforce","login","web","forms"]},
+    {name:"XSS-Payloads",path:"/opt/tools/linux/exploit/xss_payloads/",desc:"XSS payload collection",type:"github",cat:"exploit",tags:["xss","payloads","collection","bypass"]},
+    {name:"Crypto-Attacks",path:"/opt/tools/linux/exploit/crypto_attacks/",desc:"Cryptographic attack implementations",type:"github",cat:"exploit",tags:["crypto","attacks","rsa","padding"]},
+    {name:"ExploitDB",path:"exploitdb",desc:"Exploit database archive (searchsploit)",type:"apt",cat:"exploit",tags:["exploits","database","search","cve"]},
+    {name:"PowerShell-Empire",path:"powershell-empire",desc:"PowerShell post-exploitation agent",type:"apt",cat:"exploit",tags:["c2","powershell","agent","post"]},
+    {name:"PowerSploit",path:"powersploit",desc:"PowerShell post-exploitation modules",type:"apt",cat:"exploit",tags:["powershell","privesc","exfil","persist"]},
+    {name:"Hyperion",path:"hyperion",desc:"PE runtime encryptor for AV bypass",type:"apt",cat:"exploit",tags:["pe","encrypt","av","bypass","runtime"]},
+    {name:"MSFPC",path:"msfpc",desc:"Metasploit payload creator helper",type:"apt",cat:"exploit",tags:["metasploit","payload","generator","msfvenom"]},
+    {name:"Exe2hexbat",path:"exe2hexbat",desc:"Convert EXE to hex BAT file",type:"apt",cat:"exploit",tags:["exe","hex","bat","transfer","encode"]},
+    {name:"Webshells",path:"webshells",desc:"Web shell collection",type:"apt",cat:"exploit",tags:["webshell","php","asp","jsp","backdoor"]},
+    {name:"Windows-binaries",path:"windows-binaries",desc:"Precompiled Windows tools",type:"apt",cat:"exploit",tags:["windows","binaries","tools","precompiled"]},
+    {name:"Legion",path:"legion",desc:"Network pentest framework GUI",type:"apt",cat:"exploit",tags:["framework","gui","automation","scanner"]},
+    {name:"Faraday",path:"faraday",desc:"Collaborative pentest platform",type:"apt",cat:"exploit",tags:["collaborative","platform","reporting","integration"]},
+    {name:"Armitage",path:"armitage",desc:"Metasploit GUI - graphical cyber attack management",type:"apt",cat:"exploit",tags:["metasploit","gui","graphical","collaborative","visualization"]},
+    {name:"Gophish",path:"gophish",desc:"Phishing campaign framework",type:"apt",cat:"exploit",tags:["phishing","campaign","email","social","awareness"]},
+    {name:"Havoc",path:"havoc",desc:"Modern C2 framework - evasive, customizable",type:"apt",cat:"exploit",tags:["c2","framework","post","implant","beacon"]},
+    {name:"Starkiller",path:"starkiller",desc:"PowerShell Empire GUI frontend",type:"apt",cat:"exploit",tags:["empire","gui","c2","powershell","frontend"]},
+    {name:"Villain",path:"villain",desc:"Backdoor generator and multi-handler",type:"apt",cat:"exploit",tags:["backdoor","handler","reverse","shell","hoaxshell"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // SNIFFING & SPOOFING
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Responder",path:"responder",desc:"LLMNR/NBT-NS/mDNS/WPAD poisoner with NTLM capture",type:"apt",cat:"sniffing",tags:["llmnr","nbtns","poison","relay","ntlm","wpad","mdns"]},
+    {name:"mitm6",path:"mitm6",desc:"IPv6 attack via DHCPv6 - DNS takeover + relay",type:"pip",cat:"sniffing",tags:["ipv6","dhcp","mitm","relay","dns","wpad"]},
+    {name:"Bettercap",path:"bettercap",desc:"Network attack framework - ARP, DNS, WiFi, BLE",type:"apt",cat:"sniffing",tags:["mitm","arp","dns","sniff","wifi","bluetooth","ble","spoof"]},
+    {name:"Ettercap",path:"ettercap-common",desc:"MITM attack suite with filters and plugins",type:"apt",cat:"sniffing",tags:["mitm","arp","sniff","filter","inject"]},
+    {name:"Arpspoof",path:"dsniff",desc:"ARP cache poisoning for MITM",type:"apt",cat:"sniffing",tags:["arp","spoof","mitm","poison"]},
+    {name:"Dnsspoof",path:"dsniff",desc:"DNS response spoofing",type:"apt",cat:"sniffing",tags:["dns","spoof","mitm","redirect"]},
+    {name:"Macchanger",path:"macchanger",desc:"Change MAC address for anonymity",type:"apt",cat:"sniffing",tags:["mac","spoof","change","anonymity"]},
+    {name:"Mitmproxy",path:"mitmproxy",desc:"Interactive HTTPS proxy with scripting",type:"apt",cat:"sniffing",tags:["http","https","proxy","intercept","modify","script"]},
+    {name:"SSLstrip",path:"sslstrip",desc:"HTTPS to HTTP downgrade attack",type:"apt",cat:"sniffing",tags:["ssl","strip","mitm","downgrade","https"]},
+    {name:"Dsniff",path:"dsniff",desc:"Network auditing/sniffing toolkit",type:"apt",cat:"sniffing",tags:["sniff","password","arp","dns","filesnarf","mailsnarf"]},
+    {name:"SSLdump",path:"ssldump",desc:"SSL/TLS traffic analyzer",type:"apt",cat:"sniffing",tags:["ssl","tls","dump","decrypt","analyze"]},
+    {name:"SSLsplit",path:"sslsplit",desc:"Transparent SSL/TLS MITM proxy",type:"apt",cat:"sniffing",tags:["ssl","tls","mitm","proxy","intercept"]},
+    {name:"Spooftooph",path:"spooftooph",desc:"Bluetooth device spoofing",type:"apt",cat:"sniffing",tags:["bluetooth","spoof","mac","clone"]},
+    {name:"Urlsnarf",path:"urlsnarf",desc:"Sniff HTTP URLs from traffic",type:"apt",cat:"sniffing",tags:["http","urls","sniff","dsniff"]},
+    {name:"Webspy",path:"webspy",desc:"Display sniffed URLs in browser",type:"apt",cat:"sniffing",tags:["http","urls","browser","dsniff"]},
+    {name:"Filesnarf",path:"filesnarf",desc:"Sniff NFS file transfers",type:"apt",cat:"sniffing",tags:["nfs","files","sniff","dsniff"]},
+    {name:"Msgsnarf",path:"msgsnarf",desc:"Sniff chat messages",type:"apt",cat:"sniffing",tags:["chat","messages","sniff","dsniff"]},
+    {name:"Tcpkill",path:"tcpkill",desc:"Kill TCP connections",type:"apt",cat:"sniffing",tags:["tcp","kill","reset","dos"]},
+    {name:"Tcpnice",path:"tcpnice",desc:"Slow down TCP connections",type:"apt",cat:"sniffing",tags:["tcp","slow","throttle","qos"]},
+    {name:"Netsniff-ng",path:"netsniff-ng",desc:"High-performance packet capture",type:"apt",cat:"sniffing",tags:["capture","packets","high-performance","zero-copy"]},
+    {name:"Arpwatch",path:"arpwatch",desc:"Monitor ARP changes - detect spoofing/new hosts",type:"apt",cat:"sniffing",tags:["arp","monitor","detection","network","changes"]},
+    {name:"Driftnet",path:"driftnet",desc:"Sniff images from network traffic",type:"apt",cat:"sniffing",tags:["images","sniff","pictures","http","visual"]},
+    {name:"Macof",path:"dsniff",desc:"MAC flooding - CAM table overflow attack",type:"apt",cat:"sniffing",tags:["mac","flood","cam","overflow","switch"]},
+    {name:"Sshow",path:"dsniff",desc:"SSH traffic analysis - version, keystroke timing",type:"apt",cat:"sniffing",tags:["ssh","traffic","analysis","keystrokes","timing"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // MISC & UTILITIES
+    // ═══════════════════════════════════════════════════════════════
+    {name:"Tor",path:"tor",desc:"Anonymity network",type:"apt",cat:"misc",tags:["anonymity","proxy","onion"]},
+    {name:"Torsocks",path:"torsocks",desc:"Tor wrapper",type:"apt",cat:"misc",tags:["tor","proxy"]},
+    {name:"Proxychains4",path:"proxychains4",desc:"Proxy chains",type:"apt",cat:"misc",tags:["proxy","chain"]},
+    {name:"Tmux",path:"tmux",desc:"Terminal multiplexer",type:"apt",cat:"misc",tags:["terminal","multiplex"]},
+    {name:"Vim",path:"vim",desc:"Text editor",type:"apt",cat:"misc",tags:["editor","text"]},
+    {name:"Git",path:"git",desc:"Version control",type:"apt",cat:"misc",tags:["version","control","repo"]},
+    {name:"Jq",path:"jq",desc:"JSON processor",type:"apt",cat:"misc",tags:["json","parse","query"]},
+    {name:"Xxd",path:"xxd",desc:"Hex dump",type:"apt",cat:"misc",tags:["hex","dump","binary"]},
+    {name:"Base64",path:"coreutils",desc:"Base64 encode/decode",type:"apt",cat:"misc",tags:["base64","encode","decode"]},
+    {name:"OpenSSL",path:"openssl",desc:"SSL/TLS toolkit",type:"apt",cat:"misc",tags:["ssl","tls","crypto","certificates"]},
+    {name:"Netcat-OpenBSD",path:"netcat-openbsd",desc:"Netcat OpenBSD",type:"apt",cat:"misc",tags:["netcat","connect"]},
+    {name:"Rlwrap",path:"rlwrap",desc:"Readline wrapper",type:"apt",cat:"misc",tags:["readline","history","shell"]},
+    {name:"Python3",path:"python3",desc:"Python interpreter",type:"apt",cat:"misc",tags:["python","scripting"]},
+    {name:"Pip",path:"python3-pip",desc:"Python packages",type:"apt",cat:"misc",tags:["python","packages"]},
+    {name:"Ruby",path:"ruby",desc:"Ruby interpreter",type:"apt",cat:"misc",tags:["ruby","scripting"]},
+    {name:"Perl",path:"perl",desc:"Perl interpreter",type:"apt",cat:"misc",tags:["perl","scripting"]},
+    {name:"PowerShell",path:"powershell",desc:"PowerShell Core",type:"apt",cat:"misc",tags:["powershell","scripting","windows"]},
+    {name:"Rfkill",path:"rfkill",desc:"Enable/disable wireless devices",type:"apt",cat:"misc",tags:["wireless","bluetooth","wifi","disable"]},
+    {name:"Sakis3g",path:"sakis3g",desc:"3G/4G modem connection manager",type:"apt",cat:"misc",tags:["3g","4g","modem","mobile"]},
+    {name:"Unix-privesc-check",path:"unix-privesc-check",desc:"Unix/Linux privilege escalation checker",type:"apt",cat:"misc",tags:["privesc","unix","linux","audit"]},
+    {name:"CVE-2024-26229",path:"/opt/tools/linux/exploit/cve_2024_26229/",desc:"Windows CSC driver LPE",type:"github",cat:"misc",tags:["cve","windows","lpe","kernel"]},
+    {name:"CVE-2024-30051",path:"/opt/tools/linux/exploit/cve_2024_30051/",desc:"Windows DWM LPE",type:"github",cat:"misc",tags:["cve","windows","lpe","dwm"]},
+    {name:"CVE-2024-30088",path:"/opt/tools/linux/exploit/cve_2024_30088/",desc:"Windows kernel pool LPE",type:"github",cat:"misc",tags:["cve","windows","lpe","kernel"]},
+    {name:"CVE-2024-4577",path:"/opt/tools/linux/exploit/cve_2024_4577/",desc:"PHP CGI argument injection RCE",type:"github",cat:"misc",tags:["cve","php","rce","cgi"]},
+    {name:"CVE-2025-21298",path:"/opt/tools/linux/exploit/cve_2025_21298/",desc:"Windows OLE RCE",type:"github",cat:"misc",tags:["cve","windows","rce","ole"]},
+    {name:"CVE-2025-30397",path:"/opt/tools/linux/exploit/cve_2025_30397/",desc:"Windows scripting engine RCE",type:"github",cat:"misc",tags:["cve","windows","rce","scripting"]},
+    {name:"PayloadsAllTheThings",path:"/opt/tools/resources/payloadsallthethings/",desc:"Web app payload collection",type:"github",cat:"misc",tags:["payloads","cheatsheet","collection","web"]},
+    {name:"LOLBins-Beyond",path:"/opt/tools/resources/lolbins_beyond/",desc:"LOLBins and GTFOBins reference",type:"github",cat:"misc",tags:["lolbins","gtfobins","reference","living"]},
+    {name:"LOL-Abused",path:"/opt/tools/resources/lol_abused/",desc:"Abused legitimate tools reference",type:"github",cat:"misc",tags:["lolbins","abuse","legitimate","living"]},
+    {name:"Nishang-Scripts",path:"/opt/tools/windows/ad/nishang/",desc:"PowerShell offensive framework",type:"github",cat:"misc",tags:["powershell","shells","bypass","exfil"]},
+    {name:"Dos2unix",path:"dos2unix",desc:"Line ending converter",type:"apt",cat:"misc",tags:["convert","line","ending","crlf"]},
+    {name:"Sendemail",path:"sendemail",desc:"Command line SMTP email sender",type:"apt",cat:"misc",tags:["smtp","email","send","cli"]},
+    {name:"Recordmydesktop",path:"recordmydesktop",desc:"Desktop screen recorder",type:"apt",cat:"misc",tags:["screen","record","video","capture"]},
+    {name:"FreeRDP",path:"freerdp3-x11",desc:"RDP client",type:"apt",cat:"misc",tags:["rdp","client","remote","desktop"]},
+    {name:"SQLiteBrowser",path:"sqlitebrowser",desc:"SQLite database browser GUI",type:"apt",cat:"misc",tags:["sqlite","database","gui","browser"]},
+    {name:"Neo4j",path:"neo4j",desc:"Graph database for BloodHound",type:"apt",cat:"misc",tags:["graph","database","bloodhound","cypher"]},
+    {name:"SSLscan",path:"sslscan",desc:"SSL/TLS scanner",type:"apt",cat:"misc",tags:["ssl","tls","scanner","cipher","certificate"]},
+    {name:"ATFTPD",path:"atftpd",desc:"TFTP server",type:"apt",cat:"misc",tags:["tftp","server","transfer","pxe"]},
+    {name:"PEASS",path:"peass",desc:"Privilege escalation scripts (linpeas/winpeas)",type:"apt",cat:"misc",tags:["privesc","enumeration","linpeas","winpeas"]},
+    {name:"Goshs",path:"goshs",desc:"Go Simple HTTP Server - file upload/download",type:"apt",cat:"misc",tags:["http","server","upload","download","transfer"]},
+
+    // ═══════════════════════════════════════════════════════════════
+    // PYTHON LIBRARIES
+    // ═══════════════════════════════════════════════════════════════
+    {name:"impacket",path:"pip install impacket",desc:"SMB/LDAP/Kerberos/WMI/MSRPC protocol implementations",type:"lib",cat:"library",tags:["smb","ldap","kerberos","wmi","msrpc","ntlm","secretsdump"]},
+    {name:"scapy",path:"pip install scapy",desc:"Packet crafting/sniffing/manipulation framework",type:"lib",cat:"library",tags:["packets","network","sniff","craft","forge"]},
+    {name:"requests",path:"pip install requests",desc:"HTTP/HTTPS requests with sessions and auth",type:"lib",cat:"library",tags:["http","web","api","session","cookies"]},
+    {name:"pycryptodome",path:"pip install pycryptodome",desc:"Cryptographic primitives - AES, RSA, hashes",type:"lib",cat:"library",tags:["crypto","encryption","aes","rsa","hash","cipher"]},
+    {name:"paramiko",path:"pip install paramiko",desc:"SSHv2 protocol - connections, SFTP, exec",type:"lib",cat:"library",tags:["ssh","sftp","scp","exec","tunnel"]},
+    {name:"ldap3",path:"pip install ldap3",desc:"LDAP v3 client - queries, modify, auth",type:"lib",cat:"library",tags:["ldap","directory","bind","search","modify"]},
+    {name:"dnspython",path:"pip install dnspython",desc:"DNS queries, zone transfers, record types",type:"lib",cat:"library",tags:["dns","resolver","axfr","query"]},
+    {name:"beautifulsoup4",path:"pip install beautifulsoup4",desc:"HTML/XML parsing and scraping",type:"lib",cat:"library",tags:["html","parsing","scraping","web"]},
+    {name:"pefile",path:"pip install pefile",desc:"PE file parsing - headers, imports, exports",type:"lib",cat:"library",tags:["pe","windows","exe","dll","imports"]},
+    {name:"yara-python",path:"pip install yara-python",desc:"YARA rules matching and malware detection",type:"lib",cat:"library",tags:["yara","malware","rules","detection"]},
+    {name:"oletools",path:"pip install oletools",desc:"MS Office malware analysis - macros, VBA",type:"lib",cat:"library",tags:["office","macros","vba","malware","olevba"]},
+    {name:"boto3",path:"pip install boto3",desc:"AWS SDK for Python - all AWS services",type:"lib",cat:"library",tags:["aws","cloud","s3","ec2","iam","lambda"]},
+    {name:"pyopenssl",path:"pip install pyopenssl",desc:"OpenSSL bindings for certificates and TLS",type:"lib",cat:"library",tags:["ssl","tls","certificates","x509"]},
+    {name:"cryptography",path:"pip install cryptography",desc:"Modern cryptography - Fernet, X.509, hazmat",type:"lib",cat:"library",tags:["crypto","x509","fernet","hazmat"]},
+    {name:"pyasn1",path:"pip install pyasn1",desc:"ASN.1 encoding/decoding for protocols",type:"lib",cat:"library",tags:["asn1","encoding","x509","ldap"]},
+    {name:"netaddr",path:"pip install netaddr",desc:"Network address manipulation - IPs, CIDRs",type:"lib",cat:"library",tags:["network","ip","cidr","mac"]},
+    {name:"netifaces",path:"pip install netifaces",desc:"System network interface information",type:"lib",cat:"library",tags:["network","interface","ip","gateway"]},
+    {name:"psutil",path:"pip install psutil",desc:"Process/system utilities - CPU, mem, disk, net",type:"lib",cat:"library",tags:["process","system","memory","network"]},
+    {name:"colorama",path:"pip install colorama",desc:"Cross-platform colored terminal output",type:"lib",cat:"library",tags:["terminal","color","output"]},
+    {name:"rich",path:"pip install rich",desc:"Rich text formatting and progress bars",type:"lib",cat:"library",tags:["terminal","format","progress","tables"]},
+    {name:"pwntools",path:"pip install pwntools",desc:"CTF/exploit dev framework - shellcode, ROP, tubes",type:"lib",cat:"library",tags:["exploit","ctf","shellcode","rop","pwn","binary"]},
+    {name:"angr",path:"pip install angr",desc:"Binary analysis framework - symbolic execution",type:"lib",cat:"library",tags:["binary","symbolic","analysis","reverse","emulation"]},
+    {name:"capstone",path:"pip install capstone",desc:"Multi-arch disassembly framework",type:"lib",cat:"library",tags:["disassembly","x86","arm","mips","reverse"]},
+    {name:"keystone-engine",path:"pip install keystone-engine",desc:"Multi-arch assembler framework",type:"lib",cat:"library",tags:["assembler","x86","arm","shellcode"]},
+    {name:"unicorn",path:"pip install unicorn",desc:"Multi-arch CPU emulator framework",type:"lib",cat:"library",tags:["emulation","cpu","x86","arm","qemu"]},
+    {name:"z3-solver",path:"pip install z3-solver",desc:"SMT solver for constraint solving",type:"lib",cat:"library",tags:["smt","solver","symbolic","constraints","sat"]},
+    {name:"r2pipe",path:"pip install r2pipe",desc:"Radare2 Python bindings for scripting",type:"lib",cat:"library",tags:["radare2","r2","disassembly","scripting"]},
+    {name:"ROPGadget",path:"pip install ROPGadget",desc:"ROP gadget finder for binaries",type:"lib",cat:"library",tags:["rop","gadgets","exploit","binary"]},
+    {name:"ropper",path:"pip install ropper",desc:"ROP/JOP gadget finder and chain builder",type:"lib",cat:"library",tags:["rop","jop","gadgets","chain","exploit"]},
+    {name:"aiohttp",path:"pip install aiohttp",desc:"Async HTTP client/server for fast scanning",type:"lib",cat:"library",tags:["http","async","web","scanning","concurrent"]},
+    {name:"httpx",path:"pip install httpx",desc:"Modern HTTP client with HTTP/2 support",type:"lib",cat:"library",tags:["http","http2","async","web","client"]},
+    {name:"selenium",path:"pip install selenium",desc:"Browser automation for web testing",type:"lib",cat:"library",tags:["browser","automation","web","headless","testing"]},
+    {name:"playwright",path:"pip install playwright",desc:"Modern browser automation - Chromium/Firefox/WebKit",type:"lib",cat:"library",tags:["browser","automation","chromium","firefox","webkit"]},
+    {name:"websockets",path:"pip install websockets",desc:"WebSocket client/server for WS testing",type:"lib",cat:"library",tags:["websocket","ws","realtime","async"]},
+    {name:"shodan",path:"pip install shodan",desc:"Shodan API for internet device search",type:"lib",cat:"library",tags:["shodan","iot","search","reconnaissance","api"]},
+    {name:"censys",path:"pip install censys",desc:"Censys API for internet-wide scanning data",type:"lib",cat:"library",tags:["censys","scanning","certificates","api","recon"]},
+    {name:"frida",path:"pip install frida-tools",desc:"Dynamic instrumentation toolkit",type:"lib",cat:"library",tags:["instrumentation","hooking","mobile","reverse","dynamic"]},
+    {name:"kubernetes",path:"pip install kubernetes",desc:"Kubernetes API client for k8s pentesting",type:"lib",cat:"library",tags:["kubernetes","k8s","cloud","containers","api"]},
+    {name:"lxml",path:"pip install lxml",desc:"Fast XML/HTML parsing - useful for XXE/SOAP",type:"lib",cat:"library",tags:["xml","html","parsing","xxe","soap"]},
+    {name:"Jinja2",path:"pip install Jinja2",desc:"Template engine - SSTI testing reference",type:"lib",cat:"library",tags:["template","ssti","injection","web"]},
+    {name:"PyJWT",path:"pip install PyJWT",desc:"JWT encoding/decoding and manipulation",type:"lib",cat:"library",tags:["jwt","token","auth","web","api"]},
+    {name:"msal",path:"pip install msal",desc:"Microsoft Authentication Library for Azure/M365",type:"lib",cat:"library",tags:["azure","m365","oauth","microsoft","auth"]},
+    {name:"volatility3",path:"pip install volatility3",desc:"Memory forensics framework",type:"lib",cat:"library",tags:["memory","forensics","malware","incident"]},
+    {name:"qiling",path:"pip install qiling",desc:"Binary emulation framework - multi-arch",type:"lib",cat:"library",tags:["emulation","binary","sandbox","multi-arch"]},
+    {name:"numpy",path:"pip install numpy",desc:"Numerical computing - crypto/ML attacks",type:"lib",cat:"library",tags:["numerical","math","array","crypto","ml"]},
+    {name:"pandas",path:"pip install pandas",desc:"Data analysis for log/recon data processing",type:"lib",cat:"library",tags:["data","analysis","csv","dataframe"]},
+    {name:"matplotlib",path:"pip install matplotlib",desc:"Plotting library for data visualization",type:"lib",cat:"library",tags:["plotting","graphs","visualization","data"]},
+    {name:"pillow",path:"pip install pillow",desc:"Image processing - stego, metadata, OCR prep",type:"lib",cat:"library",tags:["image","stego","exif","processing"]},
+    {name:"Flask",path:"pip install Flask",desc:"Micro web framework - quick C2/phishing servers",type:"lib",cat:"library",tags:["web","server","api","phishing","c2"]},
+    {name:"fastapi",path:"pip install fastapi",desc:"Modern async web framework with OpenAPI",type:"lib",cat:"library",tags:["web","async","api","openapi","server"]},
+    {name:"Twisted",path:"pip install Twisted",desc:"Event-driven networking - custom protocols",type:"lib",cat:"library",tags:["networking","async","protocols","tcp","udp"]},
+    {name:"pyserial",path:"pip install pyserial",desc:"Serial port access for hardware hacking",type:"lib",cat:"library",tags:["serial","uart","hardware","embedded","iot"]},
+    {name:"black",path:"pip install black",desc:"Code formatter - consistent Python style",type:"lib",cat:"library",tags:["formatter","code","style","pep8","dev"]},
+    {name:"bandit",path:"pip install bandit",desc:"Security linter - finds vulnerabilities in Python code",type:"lib",cat:"library",tags:["security","linter","vuln","sast","audit"]},
+    {name:"docker",path:"pip install docker",desc:"Docker API - container management from Python",type:"lib",cat:"library",tags:["docker","container","api","devops"]},
+    {name:"netmiko",path:"pip install netmiko",desc:"Network device automation - SSH to routers/switches",type:"lib",cat:"library",tags:["network","ssh","cisco","automation","router","switch"]},
+    {name:"typer",path:"pip install typer",desc:"Modern CLI framework built on Click",type:"lib",cat:"library",tags:["cli","terminal","commands","click"]},
+    {name:"jupyter",path:"pip install jupyter",desc:"Interactive notebooks for analysis and reporting",type:"lib",cat:"library",tags:["notebook","interactive","analysis","reporting","ipython"]},
+    {name:"opencv-python",path:"pip install opencv-python",desc:"Computer vision - image/video analysis, QR codes",type:"lib",cat:"library",tags:["vision","image","video","cv","qrcode","ocr"]},
+    {name:"scikit-learn",path:"pip install scikit-learn",desc:"Machine learning for security analysis",type:"lib",cat:"library",tags:["ml","machine-learning","classification","anomaly"]},
+];
+
+// Render
+function renderTools() {
+    document.querySelectorAll('.category').forEach(cat => {
+        const catName = cat.dataset.cat;
+        const container = cat.querySelector('.tools');
+        container.innerHTML = '';
+
+        toolsData.filter(t => t.cat === catName).forEach((tool, idx) => {
+            const globalIdx = toolsData.indexOf(tool);
+            const div = document.createElement('div');
+            div.className = 'tool visible';
+            div.dataset.idx = globalIdx;
+            div.dataset.tags = tool.tags.join(' ');
+            div.dataset.name = tool.name.toLowerCase();
+            div.dataset.desc = tool.desc.toLowerCase();
+            div.dataset.type = tool.type;
+            div.dataset.cat = tool.cat;
+
+            const typeClass = {github:'github',apt:'apt',pip:'pip',pipx:'pipx',gem:'gem',lib:'lib'}[tool.type] || '';
+
+            div.innerHTML = `
+                <span class="tool-type ${typeClass}">${tool.type.toUpperCase()}</span>
+                <span class="tool-name">${tool.name}</span>
+                <span class="tool-path">${tool.path}</span>
+                <span class="tool-desc">${tool.desc}</span>
+                <span class="tool-tags">${tool.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')}</span>
+            `;
+            container.appendChild(div);
+        });
+    });
+    updateCount();
+}
+
+function filterTools() {
+    const search = document.getElementById('search').value.toLowerCase().trim();
+    const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+
+    let visible = 0;
+    document.querySelectorAll('.tool').forEach(tool => {
+        const matchesSearch = !search ||
+            tool.dataset.name.includes(search) ||
+            tool.dataset.tags.includes(search) ||
+            tool.dataset.desc.includes(search);
+
+        let matchesFilter = activeFilter === 'all';
+        if (activeFilter === 'windows') matchesFilter = tool.dataset.cat.includes('windows') || tool.dataset.cat === 'tunneling';
+        if (activeFilter === 'linux') matchesFilter = tool.dataset.cat === 'linux';
+        if (activeFilter === 'cloud') matchesFilter = tool.dataset.cat === 'cloud' || tool.dataset.cat === 'container';
+        if (activeFilter === 'web') matchesFilter = tool.dataset.cat === 'web';
+        if (activeFilter === 'network') matchesFilter = ['network','wireless','sniffing'].includes(tool.dataset.cat);
+        if (activeFilter === 'library') matchesFilter = tool.dataset.cat === 'library' || tool.dataset.type === 'lib';
+        if (activeFilter === 'apt') matchesFilter = tool.dataset.type === 'apt';
+
+        if (matchesSearch && matchesFilter) {
+            tool.classList.add('visible');
+            visible++;
+        } else {
+            tool.classList.remove('visible');
+        }
+    });
+
+    document.querySelectorAll('.category').forEach(cat => {
+        cat.classList.toggle('hidden', !cat.querySelector('.tool.visible'));
+    });
+
+    document.getElementById('no-results').classList.toggle('visible', visible === 0);
+    document.getElementById('visible-count').textContent = visible;
+}
+
+function searchTag(tag) {
+    document.getElementById('search').value = tag;
+    filterTools();
+}
+
+function updateCount() {
+    document.getElementById('visible-count').textContent = document.querySelectorAll('.tool.visible').length;
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filterTools();
+    });
+});
+
+document.getElementById('search').addEventListener('input', filterTools);
+
+function showExport() {
+    document.getElementById('export-modal').classList.add('visible');
+    exportAs('txt');
+}
+
+function closeExport() {
+    document.getElementById('export-modal').classList.remove('visible');
+}
+
+function exportAs(format) {
+    const visibleTools = [...document.querySelectorAll('.tool.visible')].map(el => toolsData[el.dataset.idx]);
+    let content = '';
+    if (format === 'txt') {
+        content = visibleTools.map(t => `${t.name} | ${t.path} | ${t.desc} | ${t.tags.join(', ')}`).join('\n');
+    } else if (format === 'csv') {
+        content = 'Name,Path,Description,Type,Tags\n' + visibleTools.map(t => `"${t.name}","${t.path}","${t.desc}","${t.type}","${t.tags.join('; ')}"`).join('\n');
+    } else if (format === 'json') {
+        content = JSON.stringify(visibleTools, null, 2);
+    }
+    document.getElementById('export-content').value = content;
+}
+
+function copyExport() {
+    document.getElementById('export-content').select();
+    document.execCommand('copy');
+    alert('Copied!');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG MANAGER FUNCTIONALITY
+// ═══════════════════════════════════════════════════════════════
+let currentConfigType = null;
+let currentConfigId = null;
+
+function showDotfiles() {
+    document.getElementById('dotfiles-modal').classList.add('visible');
+    switchConfigTab('zshrc');
+}
+
+function closeDotfiles() {
+    document.getElementById('dotfiles-modal').classList.remove('visible');
+    document.getElementById('zshrc-select').value = '';
+    document.getElementById('zellij-config-select').value = '';
+    document.getElementById('hotkey-preset').value = '';
+    document.getElementById('zshrc-info').style.display = 'none';
+    document.getElementById('zellij-config-info').style.display = 'none';
+    document.getElementById('hotkey-preset-info').style.display = 'none';
+    hideHotkeyEditor();
+}
+
+function switchConfigTab(tab) {
+    document.querySelectorAll('.config-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById('zshrc-panel').style.display = tab === 'zshrc' ? 'block' : 'none';
+    document.getElementById('tmux-panel').style.display = tab === 'tmux' ? 'block' : 'none';
+    document.getElementById('zellij-panel').style.display = tab === 'zellij' ? 'block' : 'none';
+}
+
+function switchSubTab(subtab) {
+    document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-subtab="${subtab}"]`).classList.add('active');
+    document.getElementById('zellij-config-panel').style.display = subtab === 'zellij-config' ? 'block' : 'none';
+    document.getElementById('zellij-hotkeys-panel').style.display = subtab === 'zellij-hotkeys' ? 'block' : 'none';
+}
+
+function loadZshConfig() {
+    const val = document.getElementById('zshrc-select').value;
+    currentConfigType = 'zshrc';
+    const configMap = {
+        'kali_default': 'zshrc_kali_default',
+        'p3ta': 'zshrc_p3ta',
+        'jp': 'zshrc_jp'
+    };
+    currentConfigId = configMap[val] || null;
+    document.getElementById('zshrc-info').style.display = val ? 'block' : 'none';
+    document.getElementById('zshrc-status').style.display = 'none';
+}
+
+function loadZellijConfig() {
+    const val = document.getElementById('zellij-config-select').value;
+    currentConfigType = 'zellij-config';
+    currentConfigId = val;
+    document.getElementById('zellij-config-info').style.display = val ? 'block' : 'none';
+    document.getElementById('zellij-config-status').style.display = 'none';
+}
+
+function loadHotkeyPreset() {
+    const val = document.getElementById('hotkey-preset').value;
+    currentConfigType = 'zellij-hotkeys';
+    currentConfigId = val;
+    document.getElementById('hotkey-preset-info').style.display = val ? 'block' : 'none';
+    document.getElementById('zellij-hotkeys-status').style.display = 'none';
+    hideHotkeyEditor();
+}
+
+function showHotkeyEditor() {
+    document.getElementById('hotkey-editor').style.display = 'block';
+    document.getElementById('hotkey-preset-info').style.display = 'none';
+    document.getElementById('hotkey-preset').value = '';
+}
+
+function hideHotkeyEditor() {
+    document.getElementById('hotkey-editor').style.display = 'none';
+    document.getElementById('hotkey-status').style.display = 'none';
+}
+
+async function installConfig(type) {
+    const statusId = type + '-status';
+    const status = document.getElementById(statusId);
+    status.style.display = 'block';
+    status.className = 'status-box';
+    status.innerHTML = 'Installing...';
+
+    let id = currentConfigId;
+    if (type === 'zshrc') id = currentConfigId;
+    else if (type === 'zellij-config') id = currentConfigId;
+    else if (type === 'zellij-hotkeys') id = currentConfigId;
+    else if (type === 'tmux-theme') id = currentTmuxTheme;
+    else if (type === 'tmux-hotkeys') id = currentTmuxHotkeyPreset;
+
+    try {
+        const resp = await fetch('/api/install-config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type, id})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            status.className = 'status-box success';
+            let msg = `<span style="color:#3fb950;font-size:1.5em;">&#10004;</span><br>Installed!`;
+            if (type === 'zshrc') msg += `<br><span style="font-size:0.85em;color:var(--text2);">Run <code>source ~/.zshrc</code></span>`;
+            else if (type.startsWith('tmux')) msg += `<br><span style="font-size:0.85em;color:var(--text2);">Run <code>tmux source ~/.tmux.conf</code></span>`;
+            else if (type.startsWith('zellij')) msg += `<br><span style="font-size:0.85em;color:var(--text2);">Restart Zellij to apply</span>`;
+            status.innerHTML = msg;
+        } else {
+            status.className = 'status-box error';
+            status.innerHTML = `<span style="color:#f85149;">Error: ${data.error}</span>`;
+        }
+    } catch (e) {
+        status.className = 'status-box error';
+        status.innerHTML = `<span style="color:#f85149;">Error: ${e.message}</span>`;
+    }
+}
+
+async function editConfig(type) {
+    let target = '~/.zshrc';
+    if (type === 'zellij-config') target = '~/.config/zellij/config.kdl';
+    else if (type === 'zellij-hotkeys') target = '~/.config/zellij/config.kdl';
+    else if (type === 'tmux-theme') target = '~/.tmux.conf';
+    else if (type === 'tmux-hotkeys') target = '~/.tmux.conf';
+
+    try {
+        const resp = await fetch('/api/edit-file', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({target})
+        });
+        const data = await resp.json();
+        if (!data.success) alert('Error: ' + data.error);
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function saveCustomHotkeys() {
+    const name = document.getElementById('hotkey-name').value.trim();
+    if (!name) {
+        alert('Please enter a name for your config');
+        return;
+    }
+
+    const hotkeys = {};
+    document.querySelectorAll('.hotkey-input').forEach(input => {
+        hotkeys[input.dataset.action] = input.value;
+    });
+
+    const status = document.getElementById('hotkey-status');
+    status.style.display = 'block';
+    status.className = 'status-box';
+    status.innerHTML = 'Saving...';
+
+    try {
+        const resp = await fetch('/api/save-hotkeys', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, hotkeys})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            status.className = 'status-box success';
+            status.innerHTML = `<span style="color:#3fb950;font-size:1.5em;">&#10004;</span><br>Saved & Installed!<br><span style="font-size:0.85em;color:var(--text2);">Restart Zellij to apply</span>`;
+        } else {
+            status.className = 'status-box error';
+            status.innerHTML = `<span style="color:#f85149;">Error: ${data.error}</span>`;
+        }
+    } catch (e) {
+        status.className = 'status-box error';
+        status.innerHTML = `<span style="color:#f85149;">Error: ${e.message}</span>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TMUX Functions
+// ═══════════════════════════════════════════════════════════════════
+
+const tmuxThemes = {
+    'catppuccin-mocha': {
+        bg: '#1e1e2e', fg: '#cdd6f4', accent: '#89b4fa', accent2: '#cba6f7',
+        preview: { left: '  main', right: '12:30  21-May' }
+    },
+    'dracula': {
+        bg: '#282a36', fg: '#f8f8f2', accent: '#bd93f9', accent2: '#ff79c6',
+        preview: { left: '  main', right: '12:30  21-May' }
+    },
+    'nord': {
+        bg: '#2e3440', fg: '#eceff4', accent: '#88c0d0', accent2: '#81a1c1',
+        preview: { left: '  main', right: '12:30  21-May' }
+    },
+    'gruvbox': {
+        bg: '#282828', fg: '#ebdbb2', accent: '#83a598', accent2: '#d3869b',
+        preview: { left: '  main', right: '12:30  21-May' }
+    },
+    'tokyo-night': {
+        bg: '#1a1b26', fg: '#c0caf5', accent: '#7aa2f7', accent2: '#bb9af7',
+        preview: { left: '  main', right: '12:30  21-May' }
+    }
+};
+
+let currentTmuxTheme = null;
+let currentTmuxHotkeyPreset = null;
+
+function switchTmuxSubTab(subtab) {
+    document.querySelectorAll('#tmux-panel .sub-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#tmux-panel [data-subtab="${subtab}"]`).classList.add('active');
+    document.getElementById('tmux-theme-panel').style.display = subtab === 'tmux-theme' ? 'block' : 'none';
+    document.getElementById('tmux-hotkeys-panel').style.display = subtab === 'tmux-hotkeys' ? 'block' : 'none';
+}
+
+function loadTmuxTheme() {
+    const val = document.getElementById('tmux-theme-select').value;
+    currentTmuxTheme = val;
+    currentConfigType = 'tmux-theme';
+    currentConfigId = val;
+
+    if (val && tmuxThemes[val]) {
+        const theme = tmuxThemes[val];
+        document.getElementById('tmux-theme-preview').style.display = 'block';
+        const bar = document.getElementById('tmux-preview-bar');
+        bar.style.background = theme.bg;
+        bar.style.color = theme.fg;
+        document.getElementById('tmux-preview-left').innerHTML = `<span style="background:${theme.accent};color:${theme.bg};padding:2px 8px;border-radius:3px;">${theme.preview.left}</span>`;
+        document.getElementById('tmux-preview-right').innerHTML = `<span style="color:${theme.accent2};">${theme.preview.right}</span>`;
+        document.getElementById('tmux-theme-info').style.display = 'block';
+    } else {
+        document.getElementById('tmux-theme-preview').style.display = 'none';
+        document.getElementById('tmux-theme-info').style.display = 'none';
+    }
+    document.getElementById('tmux-theme-status').style.display = 'none';
+}
+
+function loadTmuxHotkeyPreset() {
+    const val = document.getElementById('tmux-hotkey-preset').value;
+    currentTmuxHotkeyPreset = val;
+    currentConfigType = 'tmux-hotkeys';
+    currentConfigId = val;
+    document.getElementById('tmux-hotkey-preset-info').style.display = val ? 'block' : 'none';
+    document.getElementById('tmux-hotkeys-status').style.display = 'none';
+}
+
+function showTmuxHotkeyEditor() {
+    document.getElementById('tmux-hotkey-editor').style.display = 'block';
+    document.getElementById('tmux-hotkey-preset-info').style.display = 'none';
+    document.getElementById('tmux-hotkey-preset').value = '';
+}
+
+function hideTmuxHotkeyEditor() {
+    document.getElementById('tmux-hotkey-editor').style.display = 'none';
+    document.getElementById('tmux-hotkey-status').style.display = 'none';
+}
+
+async function saveTmuxHotkeys() {
+    const name = document.getElementById('tmux-hotkey-name').value.trim();
+    if (!name) {
+        alert('Please enter a name for your config');
+        return;
+    }
+
+    const hotkeys = {};
+    document.querySelectorAll('.tmux-hotkey-input').forEach(input => {
+        hotkeys[input.dataset.action] = input.value;
+    });
+
+    const status = document.getElementById('tmux-hotkey-status');
+    status.style.display = 'block';
+    status.className = 'status-box';
+    status.innerHTML = 'Saving...';
+
+    try {
+        const resp = await fetch('/api/save-tmux-hotkeys', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, hotkeys, theme: currentTmuxTheme || 'catppuccin-mocha'})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            status.className = 'status-box success';
+            status.innerHTML = `<span style="color:#3fb950;font-size:1.5em;">&#10004;</span><br>Saved & Installed!<br><span style="font-size:0.85em;color:var(--text2);">Restart tmux to apply</span>`;
+        } else {
+            status.className = 'status-box error';
+            status.innerHTML = `<span style="color:#f85149;">Error: ${data.error}</span>`;
+        }
+    } catch (e) {
+        status.className = 'status-box error';
+        status.innerHTML = `<span style="color:#f85149;">Error: ${e.message}</span>`;
+    }
+}
+
+renderTools();
+</script>
+</body>
+</html>

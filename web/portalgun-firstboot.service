@@ -1,0 +1,14 @@
+[Unit]
+Description=portalgun first-boot identity regeneration
+ConditionPathExists=!/var/lib/portalgun/firstboot-done
+After=local-fs.target
+Before=network-pre.target sshd.service ssh.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/opt/portalgun/bin/portalgun-firstboot.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Tools Documentation Server
+After=network.target
+
+[Service]
+Type=simple
+User=kali
+WorkingDirectory=/opt/tools-docs
+ExecStart=/usr/bin/python3 -m http.server 8888
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

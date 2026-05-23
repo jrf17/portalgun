@@ -1,0 +1,89 @@
+#compdef portalgun
+# zsh completion for portalgun
+
+_portalgun() {
+    local context state line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :_portalgun_commands' \
+        '*::arg:->args'
+
+    case $state in
+        args)
+            case $words[1] in
+                install)
+                    if (( CURRENT == 2 )); then
+                        _values 'install type' \
+                            'apt[install via apt-get]' \
+                            'github[clone from GitHub, auto-detect compile]'
+                    elif (( CURRENT >= 3 )); then
+                        case $words[2] in
+                            apt)
+                                _portalgun_apt_packages
+                                ;;
+                            github)
+                                if (( CURRENT == 3 )); then
+                                    _message 'github url (https://github.com/owner/repo)'
+                                elif (( CURRENT == 4 )); then
+                                    _portalgun_tool_dirs
+                                fi
+                                ;;
+                        esac
+                    fi
+                    ;;
+                list)
+                    _values 'type' 'all' 'apt' 'github'
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_portalgun_commands() {
+    local -a commands
+    commands=(
+        'install:install a tool and register it (apt|github)'
+        'list:list installed tools (all|apt|github)'
+        'status:show registry status'
+        'doctor:diagnose registry, symlinks, and services'
+        'sanitize:prep VM for cloning (DESTRUCTIVE — clears history/logs/identity)'
+        'help:show usage'
+    )
+    _describe -t commands 'portalgun command' commands
+}
+
+_portalgun_apt_packages() {
+    # Use cached apt package names; refresh occasionally for speed
+    local cache=${ZSH_CACHE_DIR:-$HOME/.cache/zsh}/portalgun-apt-pkgs
+    mkdir -p "${cache:h}"
+    if [[ ! -f $cache ]] || [[ $(find "$cache" -mtime +1 2>/dev/null) ]]; then
+        apt-cache pkgnames 2>/dev/null > "$cache" &|
+    fi
+    if [[ -f $cache ]]; then
+        local -a pkgs
+        pkgs=(${(f)"$(<$cache)"})
+        _describe -t packages 'apt package' pkgs
+    else
+        _message 'apt package name'
+    fi
+}
+
+_portalgun_tool_dirs() {
+    # Complete subdirectories under /opt/tools/ for github target argument
+    local base="${PORTALGUN_TOOLS_BASE:-/opt/tools}"
+    local cache=${ZSH_CACHE_DIR:-$HOME/.cache/zsh}/portalgun-tooldirs
+    mkdir -p "${cache:h}"
+    if [[ ! -f $cache ]] || [[ $(find "$cache" -mmin +5 2>/dev/null) ]]; then
+        find "$base" -maxdepth 4 -type d 2>/dev/null | sort > "$cache" &|
+    fi
+    if [[ -s $cache ]]; then
+        local -a dirs
+        dirs=(${(f)"$(<$cache)"})
+        _describe -t directories 'target directory' dirs
+    else
+        _path_files -W "$base" -/
+    fi
+}
+
+_portalgun "$@"

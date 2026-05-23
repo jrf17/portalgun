@@ -1,0 +1,94 @@
+#!/bin/bash
+# portalgun sanitize — strip credentials + identity before VM cloning.
+# This is destructive. Always confirm.
+
+sanitize_run() {
+    require_root sanitize
+
+    local force=0
+    [ "$1" = "--yes" ] && force=1
+
+    cat <<'EOF'
+
+╔═══════════════════════════════════════════════════════════════════╗
+║                  portalgun sanitize                                ║
+╠═══════════════════════════════════════════════════════════════════╣
+║  Prepares this VM for cloning + distribution. This is             ║
+║  DESTRUCTIVE and intended to run on the master image right        ║
+║  before shutdown.                                                  ║
+║                                                                    ║
+║  It will:                                                          ║
+║    1. Stop BloodHound containers (clean shutdown)                 ║
+║    2. Clear bash/zsh history (root + all /home/* users)           ║
+║    3. Clear /var/log/* + journal                                  ║
+║    4. apt clean (remove cached .debs)                             ║
+║    5. Remove /etc/sudoers.d/temp_install if present               ║
+║    6. Clear DHCP leases + NetworkManager connection state         ║
+║    7. Clear /tmp + /var/tmp                                       ║
+║    8. fstrim + zero free space (for qcow2 compression)            ║
+║                                                                    ║
+║  After sanitize, run:                                              ║
+║    sudo shutdown -h now                                            ║
+║  ...then clone the qcow2 from your hypervisor host.               ║
+║                                                                    ║
+║  First boot of each clone regenerates machine-id + SSH keys       ║
+║  via portalgun-firstboot.service.                                  ║
+║                                                                    ║
+║  WHAT IT DOES NOT REMOVE:                                          ║
+║    - BloodHound admin password (persists in the postgres volume)  ║
+║    - Firefox saved passwords (persists in the profile)            ║
+║    - portalgun registry                                            ║
+║    - /opt/tools/                                                   ║
+║  These are the things you WANT to ship in the master image.       ║
+║  If you don't want them shipped, edit them out before sanitize.   ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+EOF
+
+    if [ "$force" -ne 1 ]; then
+        printf "Continue? [y/N] "
+        read -r ans
+        [[ "$ans" =~ ^[Yy]$ ]] || { print_warning "Aborted."; return 1; }
+    fi
+
+    print_status "Stopping BloodHound CE..."
+    bloodhound-ce stop 2>/dev/null || true
+
+    print_status "Clearing shell history..."
+    : > /root/.bash_history 2>/dev/null || true
+    : > /root/.zsh_history  2>/dev/null || true
+    for u in /home/*; do
+        [ -d "$u" ] || continue
+        : > "$u/.bash_history" 2>/dev/null || true
+        : > "$u/.zsh_history"  2>/dev/null || true
+    done
+
+    print_status "Clearing logs + journal..."
+    find /var/log -type f \( -name "*.log" -o -name "*.log.*" -o -name "*.gz" \) -exec truncate -s 0 {} \; 2>/dev/null
+    journalctl --rotate --vacuum-time=1s >/dev/null 2>&1 || true
+
+    print_status "apt clean..."
+    apt-get clean 2>/dev/null || true
+
+    print_status "Removing temp_install sudoers..."
+    rm -f /etc/sudoers.d/temp_install
+
+    print_status "Clearing NetworkManager state + DHCP leases..."
+    rm -rf /var/lib/dhcp/* /var/lib/NetworkManager/* 2>/dev/null || true
+
+    print_status "Clearing /tmp and /var/tmp..."
+    rm -rf /tmp/* /tmp/.[!.]* /var/tmp/* 2>/dev/null || true
+
+    print_status "fstrim..."
+    fstrim -av 2>/dev/null || true
+
+    print_status "Zeroing free space (helps qcow2 compress small)..."
+    dd if=/dev/zero of=/var/zero bs=1M status=progress 2>/dev/null || true
+    sync
+    rm -f /var/zero
+    sync
+
+    print_success "Sanitize complete. Now: sudo shutdown -h now"
+}
+
+sanitize_run "$@"
