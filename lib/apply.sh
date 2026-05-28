@@ -145,14 +145,14 @@ apply_bundle() {
                     if [ ${#batch[@]} -ge 50 ]; then
                         (( batch_num++ )) || true
                         printf "  Installing pip batch %d...\n" "$batch_num"
-                        "$pip_cmd" install --quiet "${batch[@]}" 2>&1 | tail -2
+                        "$pip_cmd" install --quiet --break-system-packages "${batch[@]}" 2>&1 | tail -2
                         batch=()
                     fi
                 done
                 if [ ${#batch[@]} -gt 0 ]; then
                     (( batch_num++ )) || true
                     printf "  Installing pip batch %d...\n" "$batch_num"
-                    "$pip_cmd" install --quiet "${batch[@]}" 2>&1 | tail -2
+                    "$pip_cmd" install --quiet --break-system-packages "${batch[@]}" 2>&1 | tail -2
                 fi
 
                 # Register installed pip packages

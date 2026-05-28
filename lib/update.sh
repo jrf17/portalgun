@@ -118,7 +118,7 @@ update_all() {
             pip_ok=1
         else
             print_status "pip: $outdated_count outdated packages, upgrading..."
-            if "$pip_cmd" install --quiet --upgrade "${outdated_pkgs[@]}" 2>&1 | tail -3; then
+            if "$pip_cmd" install --quiet --break-system-packages --upgrade "${outdated_pkgs[@]}" 2>&1 | tail -3; then
                 print_success "pip: $outdated_count packages upgraded"
                 pip_ok=1
                 # Update registry versions for upgraded packages
