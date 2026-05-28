@@ -33,5 +33,7 @@ require_cmd() {
 }
 
 ensure_dirs() {
-    mkdir -p "$PORTALGUN_REGISTRY/apt" "$PORTALGUN_REGISTRY/github" "$PORTALGUN_LOG_DIR"
+    mkdir -p "$PORTALGUN_REGISTRY/apt" "$PORTALGUN_REGISTRY/github" \
+             "$PORTALGUN_REGISTRY/pip" "$PORTALGUN_REGISTRY/cargo" \
+             "$PORTALGUN_LOG_DIR"
 }

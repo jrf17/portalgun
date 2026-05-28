@@ -4,11 +4,15 @@ Tools Documentation Server with Dotfile Installer
 Serves static files and handles dotfile installation via API
 """
 
-from flask import Flask, send_from_directory, request, jsonify
+from flask import Flask, send_from_directory, request, jsonify, Response, stream_with_context
 import os
 import shutil
 import json
 import subprocess
+import re
+from datetime import datetime
+
+ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJn]')
 
 app = Flask(__name__)
 
@@ -76,9 +80,98 @@ def list_dotfiles():
     try:
         manifest_path = os.path.join(DOTFILES_DIR, 'manifest.json')
         with open(manifest_path, 'r') as f:
-            return jsonify(json.load(f))
+            manifest = json.load(f)
+
+        tmux_imported = []
+        if os.path.exists(IMPORTED_TMUX_INDEX):
+            with open(IMPORTED_TMUX_INDEX, 'r') as f:
+                tmux_imported = json.load(f)
+
+        return jsonify({
+            'dotfiles': manifest.get('dotfiles', []),
+            'tmux_imported': tmux_imported
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/import-dotfile', methods=['POST'])
+def import_dotfile():
+    try:
+        data = request.json
+        import_type = data.get('type')  # 'zshrc' or 'tmux'
+        name = data.get('name', '').strip()
+
+        if not name:
+            return jsonify({'success': False, 'error': 'Name required'}), 400
+
+        safe_name = ''.join(c for c in name if c.isalnum() or c in '-_').lower()
+        if not safe_name:
+            return jsonify({'success': False, 'error': 'Invalid name'}), 400
+
+        content = data.get('content')
+        if not content:
+            return jsonify({'success': False, 'error': 'No file content received'}), 400
+
+        if import_type == 'zshrc':
+            file_name = f'zshrc_imported_{safe_name}'
+            dest = os.path.join(DOTFILES_DIR, file_name)
+            with open(dest, 'w') as f:
+                f.write(content)
+
+            entry_id = f'zshrc_imported_{safe_name}'
+            entry = {
+                'id': entry_id,
+                'name': name,
+                'file': file_name,
+                'target': '~/.zshrc',
+                'description': f'Imported on {datetime.now().strftime("%Y-%m-%d")}',
+                'category': 'shell',
+                'requires': ['zsh']
+            }
+
+            manifest_path = os.path.join(DOTFILES_DIR, 'manifest.json')
+            with open(manifest_path, 'r') as f:
+                manifest = json.load(f)
+
+            manifest['dotfiles'] = [d for d in manifest['dotfiles'] if d['id'] != entry_id]
+            manifest['dotfiles'].append(entry)
+
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest, f, indent=2)
+
+            return jsonify({'success': True, 'message': f'Imported as "{name}"', 'id': entry_id})
+
+        elif import_type == 'tmux':
+            os.makedirs(IMPORTED_TMUX_DIR, exist_ok=True)
+            dest = os.path.join(IMPORTED_TMUX_DIR, f'{safe_name}.conf')
+            with open(dest, 'w') as f:
+                f.write(content)
+
+            entry = {
+                'id': safe_name,
+                'name': name,
+                'imported_at': datetime.now().isoformat()
+            }
+
+            index = []
+            if os.path.exists(IMPORTED_TMUX_INDEX):
+                with open(IMPORTED_TMUX_INDEX, 'r') as f:
+                    index = json.load(f)
+
+            index = [e for e in index if e['id'] != safe_name]
+            index.append(entry)
+
+            with open(IMPORTED_TMUX_INDEX, 'w') as f:
+                json.dump(index, f, indent=2)
+
+            return jsonify({'success': True, 'message': f'Imported as "{name}"', 'id': safe_name})
+
+        else:
+            return jsonify({'success': False, 'error': f'Unknown type: {import_type}'}), 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/edit-dotfile', methods=['POST'])
 def edit_dotfile():
@@ -134,6 +227,8 @@ ZELLIJ_DIR = os.path.join(DOTFILES_DIR, 'zellij')
 CUSTOM_HOTKEYS_DIR = os.path.join(ZELLIJ_DIR, 'custom')
 TMUX_DIR = os.path.join(DOTFILES_DIR, 'tmux')
 CUSTOM_TMUX_DIR = os.path.join(TMUX_DIR, 'custom')
+IMPORTED_TMUX_DIR = os.path.join(TMUX_DIR, 'imported')
+IMPORTED_TMUX_INDEX = os.path.join(IMPORTED_TMUX_DIR, 'index.json')
 
 # Zellij preset configs
 ZELLIJ_PRESETS = {
@@ -272,6 +367,12 @@ def install_config():
                 return jsonify({'success': False, 'error': 'Unknown tmux hotkey preset'}), 404
             target = os.path.join(HOME_DIR, '.tmux.conf')
 
+        elif config_type == 'tmux-imported':
+            source = os.path.join(IMPORTED_TMUX_DIR, f'{config_id}.conf')
+            if not os.path.exists(source):
+                return jsonify({'success': False, 'error': f'Imported config not found: {config_id}'}), 404
+            target = os.path.join(HOME_DIR, '.tmux.conf')
+
         else:
             return jsonify({'success': False, 'error': 'Invalid config type'}), 400
 
@@ -292,9 +393,12 @@ def install_config():
         # Copy config
         shutil.copy2(source, target)
 
-        # If tmux config, remove old theme plugins and run TPM install
+        # If tmux config, remove old theme plugins, run TPM install, then
+        # source the new config into all running tmux sessions so the change
+        # is visible immediately (otherwise the file changes but existing
+        # sessions keep using the old config until reload/restart).
         tpm_message = ''
-        if config_type in ['tmux-theme', 'tmux-hotkeys']:
+        if config_type in ['tmux-theme', 'tmux-hotkeys', 'tmux-imported']:
             # Remove all possible theme plugin folders to prevent conflicts
             # catppuccin/tmux, dracula/tmux, nordtheme/tmux all use 'tmux'
             # egel/tmux-gruvbox uses 'tmux-gruvbox'
@@ -312,9 +416,29 @@ def install_config():
             if os.path.exists(tpm_path):
                 try:
                     subprocess.run([tpm_path], capture_output=True, timeout=120)
-                    tpm_message = ' (theme installed)'
-                except:
-                    tpm_message = ' (run prefix+I to install theme)'
+                    tpm_message = ' (theme installed'
+                except Exception:
+                    tpm_message = ' (run prefix+I to install theme'
+            else:
+                tpm_message = ' (TPM not installed'
+
+            # Re-source the config into any running tmux server (no-op if
+            # tmux isn't running). Each running session picks up the new
+            # bindings + colors immediately.
+            try:
+                r = subprocess.run(
+                    ['tmux', 'source-file', target],
+                    capture_output=True, timeout=10
+                )
+                if r.returncode == 0:
+                    tpm_message += ', live sessions reloaded)'
+                else:
+                    # tmux not running, or other error
+                    tpm_message += ', no live tmux to reload)'
+            except FileNotFoundError:
+                tpm_message += ')'
+            except Exception:
+                tpm_message += ', reload may need prefix+r)'
 
         return jsonify({
             'success': True,
@@ -742,12 +866,251 @@ run '~/.tmux/plugins/tpm/tpm'
 '''
     return conf
 
+REGISTRY_BASE = '/var/lib/portalgun/registry'
+
+
+@app.route('/api/admin/export', methods=['GET'])
+def admin_export():
+    apt_tools    = []
+    github_tools = []
+    pip_tools    = []
+    cargo_tools  = []
+
+    def read_registry_dir(subdir, collect):
+        d = os.path.join(REGISTRY_BASE, subdir)
+        if not os.path.isdir(d):
+            return
+        for fname in sorted(os.listdir(d)):
+            if not fname.endswith('.json'):
+                continue
+            try:
+                with open(os.path.join(d, fname)) as f:
+                    data = json.load(f)
+                collect(data)
+            except Exception:
+                continue
+
+    def collect_apt(data):
+        pkg = data.get('package') or data.get('name')
+        if pkg:
+            apt_tools.append(pkg)
+
+    def collect_github(data):
+        url = data.get('url', '')
+        target = data.get('target', '')
+        if url:
+            github_tools.append({'url': url, 'target': target})
+
+    def collect_pip(data):
+        pkg = data.get('package') or data.get('name')
+        if pkg:
+            pip_tools.append(pkg)
+
+    def collect_cargo(data):
+        pkg = data.get('package') or data.get('name')
+        if pkg:
+            cargo_tools.append(pkg)
+
+    read_registry_dir('apt',    collect_apt)
+    read_registry_dir('github', collect_github)
+    read_registry_dir('pip',    collect_pip)
+    read_registry_dir('cargo',  collect_cargo)
+
+    bundle = {
+        'version': '2',
+        'exported_at': datetime.now().isoformat(),
+        'tools': {
+            'apt':    apt_tools,
+            'github': github_tools,
+            'pip':    pip_tools,
+            'cargo':  cargo_tools,
+        }
+    }
+
+    from flask import Response as FlaskResponse
+    return FlaskResponse(
+        json.dumps(bundle, indent=2),
+        mimetype='application/json',
+        headers={'Content-Disposition': 'attachment; filename="portalgun_bundle.json"'}
+    )
+
+
+@app.route('/api/admin/recent', methods=['GET'])
+def admin_recent():
+    entries = []
+    for tool_type in ['apt', 'github']:
+        type_dir = os.path.join(REGISTRY_BASE, tool_type)
+        if not os.path.isdir(type_dir):
+            continue
+        for fname in os.listdir(type_dir):
+            if not fname.endswith('.json'):
+                continue
+            try:
+                with open(os.path.join(type_dir, fname)) as f:
+                    data = json.load(f)
+                entries.append({
+                    'name': data.get('name', fname[:-5]),
+                    'type': tool_type,
+                    'added': data.get('added', ''),
+                    'status': data.get('status', 'ok'),
+                    'url': data.get('url', ''),
+                })
+            except Exception:
+                continue
+    entries.sort(key=lambda x: x.get('added', ''), reverse=True)
+    return jsonify(entries[:20])
+
+
+@app.route('/api/admin/install', methods=['POST'])
+def admin_install():
+    data = request.json
+    install_type = data.get('type', '')
+
+    def _stream_proc(cmd, cwd=None):
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1, cwd=cwd
+        )
+        for line in iter(proc.stdout.readline, ''):
+            clean = ANSI_ESCAPE.sub('', line).rstrip()
+            if clean:
+                yield clean
+        proc.stdout.close()
+        proc.wait()
+        return proc.returncode
+
+    def generate():
+        try:
+            if install_type == 'update':
+                cmd = ['sudo', '-n', 'portalgun', 'update']
+
+            elif install_type == 'all':
+                bundle = data.get('bundle', '').strip()
+                cmd = ['sudo', '-n', 'portalgun', 'install', 'all']
+                if bundle:
+                    cmd.append(bundle)
+
+            elif install_type == 'apt':
+                pkg = data.get('package', '').strip()
+                if not pkg:
+                    yield json.dumps({'line': '[!] No package name specified'}) + '\n'
+                    yield json.dumps({'done': True, 'success': False}) + '\n'
+                    return
+                cmd = ['sudo', '-n', 'portalgun', 'install', 'apt', pkg]
+
+            elif install_type == 'github':
+                url = data.get('url', '').strip()
+                os_cat = data.get('os_cat', 'linux')
+                sub_cat = data.get('sub_cat', 'misc')
+                target_dir = f'/opt/tools/{os_cat}/{sub_cat}'
+                run_requirements = data.get('requirements', False)
+                run_script = data.get('run_script', '').strip()
+                if not url:
+                    yield json.dumps({'line': '[!] No URL specified'}) + '\n'
+                    yield json.dumps({'done': True, 'success': False}) + '\n'
+                    return
+                cmd = ['sudo', '-n', 'portalgun', 'install', 'github', url, target_dir]
+
+            elif install_type == 'pip':
+                pkg = data.get('package', '').strip()
+                if not pkg:
+                    yield json.dumps({'line': '[!] No package name specified'}) + '\n'
+                    yield json.dumps({'done': True, 'success': False}) + '\n'
+                    return
+                cmd = ['pip', 'install', '--break-system-packages', pkg]
+
+            elif install_type == 'cargo':
+                pkg = data.get('package', '').strip()
+                if not pkg:
+                    yield json.dumps({'line': '[!] No package name specified'}) + '\n'
+                    yield json.dumps({'done': True, 'success': False}) + '\n'
+                    return
+                cmd = ['cargo', 'install', pkg]
+
+            else:
+                yield json.dumps({'line': f'[!] Unknown install type: {install_type}'}) + '\n'
+                yield json.dumps({'done': True, 'success': False}) + '\n'
+                return
+
+            # Run main install command, stream output
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                clean = ANSI_ESCAPE.sub('', line).rstrip()
+                if clean:
+                    yield json.dumps({'line': clean}) + '\n'
+            proc.stdout.close()
+            proc.wait()
+            rc = proc.returncode
+
+            if rc != 0:
+                yield json.dumps({'line': f'[!] Command exited with code {rc}'}) + '\n'
+                yield json.dumps({'done': True, 'success': False}) + '\n'
+                return
+
+            # GitHub post-install: requirements.txt + custom script
+            if install_type == 'github':
+                repo_name = url.rstrip('/').split('/')[-1].lower()
+                source_dir = os.path.join(target_dir, repo_name, 'source')
+
+                if run_requirements:
+                    req_file = os.path.join(source_dir, 'requirements.txt')
+                    if os.path.exists(req_file):
+                        yield json.dumps({'line': f'[+] Installing requirements.txt...'}) + '\n'
+                        pip_proc = subprocess.Popen(
+                            ['pip', 'install', '-r', req_file, '--break-system-packages'],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1
+                        )
+                        for line in iter(pip_proc.stdout.readline, ''):
+                            clean = ANSI_ESCAPE.sub('', line).rstrip()
+                            if clean:
+                                yield json.dumps({'line': clean}) + '\n'
+                        pip_proc.stdout.close()
+                        pip_proc.wait()
+                    else:
+                        yield json.dumps({'line': f'[-] No requirements.txt in {source_dir}'}) + '\n'
+
+                if run_script:
+                    script_path = os.path.join(source_dir, run_script)
+                    if os.path.exists(script_path):
+                        yield json.dumps({'line': f'[+] Running {run_script}...'}) + '\n'
+                        s_proc = subprocess.Popen(
+                            ['bash', script_path],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1, cwd=source_dir
+                        )
+                        for line in iter(s_proc.stdout.readline, ''):
+                            clean = ANSI_ESCAPE.sub('', line).rstrip()
+                            if clean:
+                                yield json.dumps({'line': clean}) + '\n'
+                        s_proc.stdout.close()
+                        s_proc.wait()
+                    else:
+                        yield json.dumps({'line': f'[!] Script not found: {script_path}'}) + '\n'
+
+            yield json.dumps({'done': True, 'success': True}) + '\n'
+
+        except Exception as e:
+            yield json.dumps({'line': f'[!] Internal error: {str(e)}'}) + '\n'
+            yield json.dumps({'done': True, 'success': False}) + '\n'
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='application/x-ndjson',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
+
+
 if __name__ == '__main__':
     # Ensure directories exist
     os.makedirs(ZELLIJ_DIR, exist_ok=True)
     os.makedirs(CUSTOM_HOTKEYS_DIR, exist_ok=True)
     os.makedirs(TMUX_DIR, exist_ok=True)
     os.makedirs(CUSTOM_TMUX_DIR, exist_ok=True)
+    os.makedirs(IMPORTED_TMUX_DIR, exist_ok=True)
 
     print(f"Serving tools documentation from {DOCS_DIR}")
     print(f"Dotfiles directory: {DOTFILES_DIR}")

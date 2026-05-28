@@ -263,7 +263,6 @@ libhidapi-libusb0
 libhsa-runtime64-1
 libhsakmt1
 libhwloc-dev
-libhydrasdr0
 libibmad5
 libibumad3
 libibverbs-dev

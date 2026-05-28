@@ -27,10 +27,12 @@ registry_list() {
 
     local types=()
     case "$filter" in
-        all)    types=(apt github) ;;
+        all)    types=(apt github pip cargo) ;;
         apt)    types=(apt) ;;
         github) types=(github) ;;
-        *)      print_error "Unknown filter: $filter (use: all, apt, github)"; exit 1 ;;
+        pip)    types=(pip) ;;
+        cargo)  types=(cargo) ;;
+        *)      print_error "Unknown filter: $filter (use: all, apt, github, pip, cargo)"; exit 1 ;;
     esac
 
     for type in "${types[@]}"; do
@@ -56,14 +58,18 @@ registry_list() {
 
 registry_status() {
     ensure_dirs
-    local apt_count=$(find "$PORTALGUN_REGISTRY/apt" -name "*.json" 2>/dev/null | wc -l)
+    local apt_count=$(find "$PORTALGUN_REGISTRY/apt"    -name "*.json" 2>/dev/null | wc -l)
     local github_count=$(find "$PORTALGUN_REGISTRY/github" -name "*.json" 2>/dev/null | wc -l)
+    local pip_count=$(find "$PORTALGUN_REGISTRY/pip"    -name "*.json" 2>/dev/null | wc -l)
+    local cargo_count=$(find "$PORTALGUN_REGISTRY/cargo"  -name "*.json" 2>/dev/null | wc -l)
     local build_failed=$(grep -l '"status": "build_failed"' "$PORTALGUN_REGISTRY"/github/*.json 2>/dev/null | wc -l)
     echo ""
     echo "Registry:        $PORTALGUN_REGISTRY"
     echo "  apt tools:     $apt_count"
     echo "  github tools:  $github_count (build_failed: $build_failed)"
-    echo "  total:         $((apt_count + github_count))"
+    echo "  pip packages:  $pip_count"
+    echo "  cargo tools:   $cargo_count"
+    echo "  total:         $((apt_count + github_count + pip_count + cargo_count))"
     echo ""
     echo "Web manifest:    $PORTALGUN_WEB_DIR/portalgun_tools.json"
     echo "Repo dir:        $PORTALGUN_REPO_DIR"

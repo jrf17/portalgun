@@ -113,10 +113,12 @@
         <button class="filter-btn" data-filter="apt">APT</button>
         <button class="export-btn" onclick="showExport()">Export</button>
         <button class="filter-btn" onclick="showDotfiles()" style="background:#a371f7;border-color:#a371f7;color:#fff;">Dotfiles</button>
+        <button class="filter-btn" onclick="showAdmin()" style="background:#d29922;border-color:#d29922;color:#000;">Admin</button>
         <span class="count"><span id="visible-count">0</span> tools</span>
     </header>
 
     <main>
+        <div class="category" data-cat="installed"><h2>Installed Tools</h2><div class="tools"></div></div>
         <div class="category" data-cat="windows-ad"><h2>Windows - Active Directory</h2><div class="tools"></div></div>
         <div class="category" data-cat="windows-privesc"><h2>Windows - Privilege Escalation</h2><div class="tools"></div></div>
         <div class="category" data-cat="windows-creds"><h2>Windows - Credentials</h2><div class="tools"></div></div>
@@ -172,9 +174,9 @@
                 <div style="display:flex;gap:10px;margin-bottom:15px;">
                     <select id="zshrc-select" onchange="loadZshConfig()" style="flex:1;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;">
                         <option value="">-- Select config --</option>
-                        <option value="kali_default">Kali Default - Stock unmodified</option>
-                        <option value="p3ta">p3ta - Starship + FZF + Zoxide</option>
-                        <option value="jp">JP - NerdFonts style</option>
+                        <option value="zshrc_kali_default">Kali Default - Stock unmodified</option>
+                        <option value="zshrc_p3ta">p3ta - Starship + FZF + Zoxide</option>
+                        <option value="zshrc_jp">JP - NerdFonts style</option>
                     </select>
                 </div>
                 <div id="zshrc-info" style="display:none;">
@@ -184,6 +186,21 @@
                     </div>
                     <div id="zshrc-status" class="status-box" style="display:none;"></div>
                 </div>
+                <div style="margin-top:20px;padding-top:15px;border-top:1px solid var(--border);">
+                    <div style="color:var(--text2);font-size:0.85em;margin-bottom:10px;">Import a .zshrc file into the library:</div>
+                    <div style="display:flex;gap:10px;margin-bottom:8px;">
+                        <input type="text" id="zshrc-import-name" placeholder="name (e.g. my-kali)"
+                               style="flex:1;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <label style="flex:1;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text2);font-size:0.9em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">
+                            <input type="file" id="zshrc-file-input" accept=".zshrc,.sh,text/*" style="display:none;" onchange="updateFileLabel(this,'zshrc-file-label')" />
+                            <span id="zshrc-file-label">Choose file…</span>
+                        </label>
+                        <button onclick="importDotfile('zshrc')" class="action-btn purple">Import</button>
+                    </div>
+                    <div id="zshrc-import-status" class="status-box" style="display:none;margin-top:10px;"></div>
+                </div>
             </div>
 
             <!-- TMUX Panel -->
@@ -191,6 +208,7 @@
                 <div style="display:flex;gap:5px;margin-bottom:15px;">
                     <button class="sub-tab active" data-subtab="tmux-theme" onclick="switchTmuxSubTab('tmux-theme')">Theme</button>
                     <button class="sub-tab" data-subtab="tmux-hotkeys" onclick="switchTmuxSubTab('tmux-hotkeys')">Hotkeys</button>
+                    <button class="sub-tab" data-subtab="tmux-imported" onclick="switchTmuxSubTab('tmux-imported')">Imported</button>
                 </div>
 
                 <!-- Tmux Theme Sub-panel -->
@@ -285,6 +303,39 @@
                             <button onclick="editConfig('tmux-hotkeys')" class="action-btn orange">Edit</button>
                         </div>
                         <div id="tmux-hotkeys-status" class="status-box" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Tmux Imported Sub-panel -->
+                <div id="tmux-imported-panel" class="sub-panel" style="display:none;">
+                    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);">
+                        <div style="color:var(--text2);font-size:0.85em;margin-bottom:10px;">Import a .tmux.conf file into the library:</div>
+                        <div style="display:flex;gap:10px;margin-bottom:8px;">
+                            <input type="text" id="tmux-import-name" placeholder="name (e.g. my-tmux)"
+                                   style="flex:1;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <label style="flex:1;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text2);font-size:0.9em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">
+                                <input type="file" id="tmux-file-input" accept=".conf,.tmux.conf,text/*" style="display:none;" onchange="updateFileLabel(this,'tmux-file-label')" />
+                                <span id="tmux-file-label">Choose file…</span>
+                            </label>
+                            <button onclick="importDotfile('tmux')" class="action-btn purple">Import</button>
+                        </div>
+                        <div id="tmux-import-status" class="status-box" style="display:none;margin-top:10px;"></div>
+                    </div>
+                    <div>
+                        <div style="color:var(--text2);font-size:0.85em;margin-bottom:10px;">Previously imported configs:</div>
+                        <select id="tmux-imported-select" onchange="loadImportedTmux()"
+                                style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;margin-bottom:15px;">
+                            <option value="">-- Select imported config --</option>
+                        </select>
+                        <div id="tmux-imported-info" style="display:none;">
+                            <div style="display:flex;gap:10px;margin-bottom:10px;">
+                                <button onclick="installConfig('tmux-imported')" class="action-btn green">Install</button>
+                                <button onclick="editConfig('tmux-imported')" class="action-btn orange">Edit ~/.tmux.conf</button>
+                            </div>
+                            <div id="tmux-imported-status" class="status-box" style="display:none;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -383,6 +434,154 @@
             </div>
 
             <button class="close-btn" onclick="closeDotfiles()" style="width:100%;margin-top:15px;">Close</button>
+        </div>
+    </div>
+
+    <!-- Admin Console Modal -->
+    <div class="modal" id="admin-modal">
+        <div class="modal-content" style="max-width:860px;max-height:92vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <h3 style="color:#d29922;margin:0;font-size:1.1em;">Admin Console</h3>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="exportBundle()" style="background:var(--bg3);border:1px solid var(--border);color:#3fb950;border-radius:6px;padding:6px 14px;cursor:pointer;">&#8595; Export Bundle</button>
+                    <button onclick="closeAdmin()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 14px;cursor:pointer;">Close</button>
+                </div>
+            </div>
+
+            <!-- Install All + Update All -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;">
+                    <div style="font-weight:600;color:#d29922;margin-bottom:4px;">Install All</div>
+                    <div style="color:var(--text2);font-size:0.8em;margin-bottom:12px;">Install everything from <code>portalgun_bundle.json</code></div>
+                    <button onclick="runInstall('all')" id="all-install-btn" class="action-btn green" style="width:100%;">&#9654; Install All</button>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;">
+                    <div style="font-weight:600;color:#89b4fa;margin-bottom:4px;">Update All</div>
+                    <div style="color:var(--text2);font-size:0.8em;margin-bottom:12px;">apt upgrade + git pull + rebuild all registered tools</div>
+                    <button onclick="runInstall('update')" id="update-install-btn" class="action-btn" style="width:100%;background:#1f4e8c;border-color:#3a7bd5;color:#fff;">&#8635; Update All</button>
+                </div>
+            </div>
+
+            <!-- Install type tabs -->
+            <div style="display:flex;gap:5px;margin-bottom:20px;">
+                <button class="config-tab active" data-admintab="apt" onclick="switchAdminTab('apt')">APT</button>
+                <button class="config-tab" data-admintab="github" onclick="switchAdminTab('github')">GitHub</button>
+                <button class="config-tab" data-admintab="pip" onclick="switchAdminTab('pip')">pip</button>
+                <button class="config-tab" data-admintab="cargo" onclick="switchAdminTab('cargo')">cargo</button>
+            </div>
+
+            <!-- APT Panel -->
+            <div id="admin-apt-panel" class="admin-panel">
+                <div style="color:var(--text2);font-size:0.82em;margin-bottom:12px;">Installs via <code>portalgun install apt</code> — registered in registry, synced to rebuild scripts.</div>
+                <div style="display:flex;gap:10px;align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">Package name</label>
+                        <input id="apt-pkg" type="text" placeholder="e.g. nmap, gobuster, ffuf"
+                               style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;font:inherit;"
+                               onkeydown="if(event.key==='Enter') runInstall('apt')">
+                    </div>
+                    <button onclick="runInstall('apt')" class="action-btn green" id="apt-install-btn">Install</button>
+                </div>
+            </div>
+
+            <!-- GitHub Panel -->
+            <div id="admin-github-panel" class="admin-panel" style="display:none;">
+                <div style="color:var(--text2);font-size:0.82em;margin-bottom:12px;">Installs via <code>portalgun install github</code> — auto-detects build system, registered, synced.</div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">GitHub URL</label>
+                    <input id="github-url" type="text" placeholder="https://github.com/owner/repo"
+                           style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;font:inherit;"
+                           oninput="updateGithubPath()">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div>
+                        <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">OS / Type</label>
+                        <select id="github-os" onchange="updateGithubSubCats()"
+                                style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;font:inherit;">
+                            <option value="linux">linux</option>
+                            <option value="windows">windows</option>
+                            <option value="tunneling">tunneling</option>
+                            <option value="cloud">cloud</option>
+                            <option value="web">web</option>
+                            <option value="recon">recon</option>
+                            <option value="passwords">passwords</option>
+                            <option value="re">re (reverse eng)</option>
+                            <option value="misc">misc</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">Category</label>
+                        <select id="github-subcat" onchange="updateGithubPath()"
+                                style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;font:inherit;">
+                        </select>
+                    </div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:0.82em;color:var(--text2);">
+                    Target: <code id="github-path-preview" style="color:var(--blue);">/opt/tools/linux/misc</code>
+                </div>
+
+                <details style="margin-bottom:16px;">
+                    <summary style="cursor:pointer;color:var(--text2);font-size:0.85em;user-select:none;">Advanced options</summary>
+                    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px;margin-top:10px;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;font-size:0.9em;">
+                            <input type="checkbox" id="github-requirements" checked style="width:15px;height:15px;">
+                            Install <code>requirements.txt</code> if found after clone
+                        </label>
+                        <div>
+                            <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">Run install script after clone (optional)</label>
+                            <input id="github-script" type="text" placeholder="setup.sh, install.sh, configure ..."
+                                   style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font:inherit;font-size:0.9em;">
+                        </div>
+                    </div>
+                </details>
+                <button onclick="runInstall('github')" class="action-btn green" id="github-install-btn" style="width:100%;">Install</button>
+            </div>
+
+            <!-- pip Panel -->
+            <div id="admin-pip-panel" class="admin-panel" style="display:none;">
+                <div style="background:rgba(249,226,175,0.08);border:1px solid rgba(249,226,175,0.3);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:0.82em;color:var(--orange);">
+                    pip installs run directly — not registered in portalgun registry or rebuild scripts.
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">Package name</label>
+                        <input id="pip-pkg" type="text" placeholder="e.g. impacket, requests, pwntools"
+                               style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;font:inherit;"
+                               onkeydown="if(event.key==='Enter') runInstall('pip')">
+                    </div>
+                    <button onclick="runInstall('pip')" class="action-btn green" id="pip-install-btn">Install</button>
+                </div>
+            </div>
+
+            <!-- cargo Panel -->
+            <div id="admin-cargo-panel" class="admin-panel" style="display:none;">
+                <div style="background:rgba(249,226,175,0.08);border:1px solid rgba(249,226,175,0.3);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:0.82em;color:var(--orange);">
+                    cargo installs run directly — not registered in portalgun registry or rebuild scripts.
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="display:block;color:var(--text2);font-size:0.82em;margin-bottom:6px;">Crate name</label>
+                        <input id="cargo-pkg" type="text" placeholder="e.g. ripgrep, fd-find, bat"
+                               style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;font:inherit;"
+                               onkeydown="if(event.key==='Enter') runInstall('cargo')">
+                    </div>
+                    <button onclick="runInstall('cargo')" class="action-btn green" id="cargo-install-btn">Install</button>
+                </div>
+            </div>
+
+            <!-- Live output terminal -->
+            <div id="admin-output-wrap" style="display:none;margin-top:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="color:var(--text2);font-size:0.82em;">Output</span>
+                    <button onclick="clearAdminOutput()"
+                            style="background:none;border:1px solid var(--border);color:var(--text2);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.78em;">Clear</button>
+                </div>
+                <pre id="admin-output"
+                     style="background:#0d1117;border:1px solid var(--border);border-radius:6px;
+                            padding:14px;height:280px;overflow-y:auto;font-family:ui-monospace,'JetBrains Mono',Menlo,monospace;
+                            font-size:0.8em;line-height:1.55;white-space:pre-wrap;word-break:break-word;margin:0;"></pre>
+            </div>
+
         </div>
     </div>
 
@@ -1255,6 +1454,7 @@ let currentConfigId = null;
 function showDotfiles() {
     document.getElementById('dotfiles-modal').classList.add('visible');
     switchConfigTab('zshrc');
+    loadDotfilesList();
 }
 
 function closeDotfiles() {
@@ -1262,9 +1462,14 @@ function closeDotfiles() {
     document.getElementById('zshrc-select').value = '';
     document.getElementById('zellij-config-select').value = '';
     document.getElementById('hotkey-preset').value = '';
+    document.getElementById('tmux-imported-select').value = '';
     document.getElementById('zshrc-info').style.display = 'none';
     document.getElementById('zellij-config-info').style.display = 'none';
     document.getElementById('hotkey-preset-info').style.display = 'none';
+    document.getElementById('tmux-imported-info').style.display = 'none';
+    document.getElementById('zshrc-import-status').style.display = 'none';
+    document.getElementById('tmux-import-status').style.display = 'none';
+    currentTmuxImported = null;
     hideHotkeyEditor();
 }
 
@@ -1286,12 +1491,7 @@ function switchSubTab(subtab) {
 function loadZshConfig() {
     const val = document.getElementById('zshrc-select').value;
     currentConfigType = 'zshrc';
-    const configMap = {
-        'kali_default': 'zshrc_kali_default',
-        'p3ta': 'zshrc_p3ta',
-        'jp': 'zshrc_jp'
-    };
-    currentConfigId = configMap[val] || null;
+    currentConfigId = val || null;
     document.getElementById('zshrc-info').style.display = val ? 'block' : 'none';
     document.getElementById('zshrc-status').style.display = 'none';
 }
@@ -1337,6 +1537,7 @@ async function installConfig(type) {
     else if (type === 'zellij-hotkeys') id = currentConfigId;
     else if (type === 'tmux-theme') id = currentTmuxTheme;
     else if (type === 'tmux-hotkeys') id = currentTmuxHotkeyPreset;
+    else if (type === 'tmux-imported') id = currentTmuxImported;
 
     try {
         const resp = await fetch('/api/install-config', {
@@ -1368,6 +1569,7 @@ async function editConfig(type) {
     else if (type === 'zellij-hotkeys') target = '~/.config/zellij/config.kdl';
     else if (type === 'tmux-theme') target = '~/.tmux.conf';
     else if (type === 'tmux-hotkeys') target = '~/.tmux.conf';
+    else if (type === 'tmux-imported') target = '~/.tmux.conf';
 
     try {
         const resp = await fetch('/api/edit-file', {
@@ -1420,6 +1622,102 @@ async function saveCustomHotkeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// Dotfile Import Functions
+// ═══════════════════════════════════════════════════════════════════
+
+async function loadDotfilesList() {
+    try {
+        const resp = await fetch('/api/dotfiles');
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        // Rebuild zshrc select: static presets + any imported entries
+        const zshrcSelect = document.getElementById('zshrc-select');
+        const staticOpts = [
+            ['', '-- Select config --'],
+            ['zshrc_kali_default', 'Kali Default - Stock unmodified'],
+            ['zshrc_p3ta', 'p3ta - Starship + FZF + Zoxide'],
+            ['zshrc_jp', 'JP - NerdFonts style']
+        ];
+        zshrcSelect.innerHTML = '';
+        staticOpts.forEach(([val, label]) => zshrcSelect.appendChild(new Option(label, val)));
+        (data.dotfiles || []).filter(df => df.id.startsWith('zshrc_imported_')).forEach(df => {
+            zshrcSelect.appendChild(new Option(`${df.name} (imported)`, df.id));
+        });
+
+        // Populate tmux imported select
+        const tmuxSelect = document.getElementById('tmux-imported-select');
+        while (tmuxSelect.options.length > 1) tmuxSelect.remove(1);
+        (data.tmux_imported || []).forEach(cfg => {
+            tmuxSelect.appendChild(new Option(cfg.name, cfg.id));
+        });
+    } catch (e) {
+        console.error('loadDotfilesList:', e);
+    }
+}
+
+function loadImportedTmux() {
+    const val = document.getElementById('tmux-imported-select').value;
+    currentTmuxImported = val || null;
+    document.getElementById('tmux-imported-info').style.display = val ? 'block' : 'none';
+    document.getElementById('tmux-imported-status').style.display = 'none';
+}
+
+function updateFileLabel(input, labelId) {
+    const label = document.getElementById(labelId);
+    label.textContent = input.files.length ? input.files[0].name : 'Choose file…';
+}
+
+async function importDotfile(type) {
+    const nameInputId = type === 'zshrc' ? 'zshrc-import-name' : 'tmux-import-name';
+    const fileInputId = type === 'zshrc' ? 'zshrc-file-input' : 'tmux-file-input';
+    const statusId    = type === 'zshrc' ? 'zshrc-import-status' : 'tmux-import-status';
+
+    const name = document.getElementById(nameInputId).value.trim();
+    if (!name) { alert('Please enter a name for this config'); return; }
+
+    const fileInput = document.getElementById(fileInputId);
+    if (!fileInput.files.length) { alert('Please choose a file to import'); return; }
+
+    const status = document.getElementById(statusId);
+    status.style.display = 'block';
+    status.className = 'status-box';
+    status.innerHTML = 'Importing…';
+
+    let content;
+    try {
+        content = await fileInput.files[0].text();
+    } catch (e) {
+        status.className = 'status-box error';
+        status.innerHTML = `<span style="color:#f85149;">Could not read file: ${e.message}</span>`;
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/import-dotfile', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type, name, content})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            status.className = 'status-box success';
+            status.innerHTML = `<span style="color:#3fb950;font-size:1.5em;">&#10004;</span><br>Saved "${name}" (${fileInput.files[0].name})`;
+            document.getElementById(nameInputId).value = '';
+            fileInput.value = '';
+            document.getElementById(type === 'zshrc' ? 'zshrc-file-label' : 'tmux-file-label').textContent = 'Choose file…';
+            await loadDotfilesList();
+        } else {
+            status.className = 'status-box error';
+            status.innerHTML = `<span style="color:#f85149;">Error: ${data.error}</span>`;
+        }
+    } catch (e) {
+        status.className = 'status-box error';
+        status.innerHTML = `<span style="color:#f85149;">Error: ${e.message}</span>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // TMUX Functions
 // ═══════════════════════════════════════════════════════════════════
 
@@ -1448,12 +1746,14 @@ const tmuxThemes = {
 
 let currentTmuxTheme = null;
 let currentTmuxHotkeyPreset = null;
+let currentTmuxImported = null;
 
 function switchTmuxSubTab(subtab) {
     document.querySelectorAll('#tmux-panel .sub-tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`#tmux-panel [data-subtab="${subtab}"]`).classList.add('active');
     document.getElementById('tmux-theme-panel').style.display = subtab === 'tmux-theme' ? 'block' : 'none';
     document.getElementById('tmux-hotkeys-panel').style.display = subtab === 'tmux-hotkeys' ? 'block' : 'none';
+    document.getElementById('tmux-imported-panel').style.display = subtab === 'tmux-imported' ? 'block' : 'none';
 }
 
 function loadTmuxTheme() {
@@ -1535,7 +1835,226 @@ async function saveTmuxHotkeys() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Admin Console
+// ═══════════════════════════════════════════════════════════════════
+
+const ADMIN_DIRS = {
+    linux:     ['enumeration', 'privesc', 'lateral', 'shells', 'c2', 'exploit', 'misc'],
+    windows:   ['ad', 'privesc', 'credentials', 'evasion', 'enumeration', 'exploit', 'misc'],
+    tunneling: ['c2', 'proxy', 'vpn', 'misc'],
+    cloud:     ['aws', 'gcp', 'azure', 'container'],
+    web:       ['scanners', 'proxies', 'frameworks', 'misc'],
+    recon:     ['passive', 'active', 'misc'],
+    passwords: ['crackers', 'wordlists', 'misc'],
+    re:        ['decompilers', 'debuggers', 'misc'],
+    misc:      ['misc']
+};
+
+function showAdmin() {
+    document.getElementById('admin-modal').classList.add('visible');
+    switchAdminTab('apt');
+    updateGithubSubCats();
+}
+
+function closeAdmin() {
+    document.getElementById('admin-modal').classList.remove('visible');
+}
+
+async function exportBundle() {
+    try {
+        const resp = await fetch('/api/admin/export');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'portalgun_bundle.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        alert('Export failed: ' + e.message);
+    }
+}
+
+function switchAdminTab(tab) {
+    document.querySelectorAll('[data-admintab]').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-admintab="${tab}"]`).classList.add('active');
+    document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+    document.getElementById(`admin-${tab}-panel`).style.display = 'block';
+}
+
+function updateGithubSubCats() {
+    const os = document.getElementById('github-os').value;
+    const subcat = document.getElementById('github-subcat');
+    subcat.innerHTML = '';
+    (ADMIN_DIRS[os] || ['misc']).forEach(cat => {
+        subcat.appendChild(new Option(cat, cat));
+    });
+    updateGithubPath();
+}
+
+function updateGithubPath() {
+    const os = document.getElementById('github-os').value;
+    const sub = document.getElementById('github-subcat').value;
+    document.getElementById('github-path-preview').textContent = `/opt/tools/${os}/${sub}`;
+}
+
+function adminOutputLine(line) {
+    const pre = document.getElementById('admin-output');
+    document.getElementById('admin-output-wrap').style.display = 'block';
+
+    let color = '#c9d1d9';
+    if (/^\[!\]|error:|failed|FAILED/i.test(line))  color = '#f85149';
+    else if (/^\[\+\]|installed|done|success/i.test(line)) color = '#3fb950';
+    else if (/^\[-\]|skip|already|warn/i.test(line)) color = '#8b949e';
+    else if (/^\[\*\]|cloning|building|compiling|fetching|detecting/i.test(line)) color = '#58a6ff';
+
+    const span = document.createElement('span');
+    span.style.color = color;
+    span.textContent = line + '\n';
+    pre.appendChild(span);
+    pre.scrollTop = pre.scrollHeight;
+}
+
+function clearAdminOutput() {
+    document.getElementById('admin-output').innerHTML = '';
+}
+
+function setInstallBusy(type, busy) {
+    const btn = document.getElementById(`${type}-install-btn`);
+    if (!btn) return;
+    btn.disabled = busy;
+    if (type === 'all') {
+        btn.innerHTML = busy ? '&#9654; Installing...' : '&#9654; Install All';
+    } else if (type === 'update') {
+        btn.innerHTML = busy ? '&#8635; Updating...' : '&#8635; Update All';
+    } else {
+        btn.textContent = busy ? 'Installing...' : 'Install';
+    }
+    btn.style.opacity = busy ? '0.6' : '1';
+}
+
+async function runInstall(type) {
+    const payloads = {
+        all:    () => ({ type: 'all' }),
+        update: () => ({ type: 'update' }),
+        apt:    () => ({ type: 'apt',    package: document.getElementById('apt-pkg').value.trim() }),
+        github: () => ({
+            type: 'github',
+            url: document.getElementById('github-url').value.trim(),
+            os_cat: document.getElementById('github-os').value,
+            sub_cat: document.getElementById('github-subcat').value,
+            requirements: document.getElementById('github-requirements').checked,
+            run_script: document.getElementById('github-script').value.trim()
+        }),
+        pip:    () => ({ type: 'pip',   package: document.getElementById('pip-pkg').value.trim() }),
+        cargo:  () => ({ type: 'cargo', package: document.getElementById('cargo-pkg').value.trim() })
+    };
+
+    const payload = payloads[type]?.();
+    if (!payload) return;
+
+    // Basic validation — all/update types need no input
+    if (type !== 'all' && type !== 'update') {
+        const pkg = payload.package || payload.url || '';
+        if (!pkg) { adminOutputLine('[!] Nothing to install — fill in the field above.'); return; }
+    }
+
+    clearAdminOutput();
+    setInstallBusy(type, true);
+    const label = type === 'all' ? 'portalgun install all' : type === 'update' ? 'portalgun update' : (payload.package || payload.url);
+    adminOutputLine(`[*] Starting ${type} install: ${label}`);
+
+    try {
+        const resp = await fetch('/api/admin/install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+            adminOutputLine(`[!] HTTP ${resp.status} — server error`);
+            setInstallBusy(type, false);
+            return;
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const ln of lines) {
+                if (!ln.trim()) continue;
+                try {
+                    const msg = JSON.parse(ln);
+                    if (msg.line !== undefined) adminOutputLine(msg.line);
+                    if (msg.done) {
+                        adminOutputLine(msg.success
+                            ? '[+] Install complete.'
+                            : '[!] Install failed — see output above.');
+                        setInstallBusy(type, false);
+                    }
+                } catch (_) { adminOutputLine(ln); }
+            }
+        }
+    } catch (e) {
+        adminOutputLine(`[!] Request failed: ${e.message}`);
+        setInstallBusy(type, false);
+    }
+}
+
+
 renderTools();
+
+async function loadInstalledTools() {
+    try {
+        const r = await fetch('portalgun_tools.json?_=' + Date.now());
+        if (!r.ok) return;
+        const data = await r.json();
+        const all = [...(data.tools.apt || []), ...(data.tools.github || [])];
+        if (!all.length) return;
+
+        const container = document.querySelector('.category[data-cat="installed"] .tools');
+        all.forEach(t => {
+            const entry = {
+                name: t.name,
+                path: t.url || t.package || '',
+                desc: t.type === 'apt'
+                    ? `apt package · v${t.version || '?'}`
+                    : `${t.repo || ''} · ${t.os || ''}/${t.category || ''}`,
+                type: t.type,
+                cat: 'installed',
+                tags: ['installed', t.type, t.name]
+            };
+            toolsData.push(entry);
+            const idx = toolsData.length - 1;
+            const typeClass = {github:'github',apt:'apt',pip:'pip'}[t.type] || '';
+            const div = document.createElement('div');
+            div.className = 'tool visible';
+            div.dataset.idx = idx;
+            div.dataset.tags = entry.tags.join(' ');
+            div.dataset.name = entry.name.toLowerCase();
+            div.dataset.desc = entry.desc.toLowerCase();
+            div.dataset.type = entry.type;
+            div.dataset.cat = 'installed';
+            div.innerHTML = `
+                <span class="tool-type ${typeClass}">${entry.type.toUpperCase()}</span>
+                <span class="tool-name">${entry.name}</span>
+                <span class="tool-path">${entry.path}</span>
+                <span class="tool-desc">${entry.desc}</span>
+                <span class="tool-tags">${entry.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')}</span>
+            `;
+            container.appendChild(div);
+        });
+        updateCount();
+    } catch (e) { /* portalgun_tools.json not available */ }
+}
+loadInstalledTools();
 </script>
 </body>
 </html>
