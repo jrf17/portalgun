@@ -2020,10 +2020,87 @@ async function runInstall(type) {
             return;
         }
 
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
+        const data = await resp.json().catch(() => null);
 
+        // Long-running job: use background job stream with auto-reconnect
+        if (data && data.job_id) {
+            await streamJob(data.job_id, type);
+            return;
+        }
+
+        // Short install: stream directly
+        await streamResponse(resp, type);
+
+    } catch (e) {
+        adminOutputLine(`[!] Request failed: ${e.message}`);
+        setInstallBusy(type, false);
+    }
+}
+
+async function streamJob(jobId, type) {
+    let offset = 0;
+    let retries = 0;
+    const maxRetries = 30; // retry for up to 30 min
+
+    while (retries < maxRetries) {
+        try {
+            const r = await fetch(`/api/admin/job/${jobId}/stream?offset=${offset}`);
+            if (!r.ok) { await new Promise(res => setTimeout(res, 3000)); retries++; continue; }
+
+            const reader = r.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            let finished = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const ln of lines) {
+                    if (!ln.trim()) continue;
+                    try {
+                        const msg = JSON.parse(ln);
+                        if (msg.pos !== undefined) offset = msg.pos;
+                        if (msg.heartbeat) continue;
+                        if (msg.progress !== undefined) {
+                            setProgress(msg.progress, msg.label, true);
+                        } else if (msg.line !== undefined) {
+                            adminOutputLine(msg.line);
+                        }
+                        if (msg.done) {
+                            if (msg.success) {
+                                setProgress(100, 'Installation complete!', true);
+                                adminOutputLine('[+] Install complete.');
+                            } else {
+                                setProgress(0, '', false);
+                                adminOutputLine('[!] Install failed — see output above.');
+                            }
+                            setInstallBusy(type, false);
+                            finished = true;
+                        }
+                    } catch (_) { adminOutputLine(ln); }
+                }
+                if (finished) return;
+            }
+            // Stream ended without done — reconnect
+            retries++;
+            await new Promise(res => setTimeout(res, 2000));
+        } catch (e) {
+            retries++;
+            await new Promise(res => setTimeout(res, 3000));
+        }
+    }
+    adminOutputLine('[!] Lost connection to install job after multiple retries.');
+    setInstallBusy(type, false);
+}
+
+async function streamResponse(resp, type) {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    try {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;

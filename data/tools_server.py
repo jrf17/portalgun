@@ -10,11 +10,17 @@ import shutil
 import json
 import subprocess
 import re
+import uuid
+import threading
+import time
 from datetime import datetime
 
 ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJn]')
 
 app = Flask(__name__)
+
+# Background job tracking for long-running installs
+JOBS = {}  # job_id -> {log, proc, done, rc}
 
 DOCS_DIR = '/opt/tools-docs'
 DOTFILES_DIR = os.path.join(DOCS_DIR, 'dotfiles')
@@ -979,16 +985,35 @@ def admin_install():
         proc.wait()
         return proc.returncode
 
+    # Long-running types: background job + log tail (survives connection drops)
+    if install_type in ('all', 'update'):
+        if install_type == 'update':
+            cmd = ['sudo', '-n', 'portalgun', 'update']
+        else:
+            bundle = data.get('bundle', '').strip()
+            cmd = ['sudo', '-n', 'portalgun', 'install', 'all']
+            if bundle:
+                cmd.append(bundle)
+
+        job_id = str(uuid.uuid4())[:8]
+        log_path = f'/tmp/pg_job_{job_id}.log'
+        log_file = open(log_path, 'w')
+        proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT)
+        JOBS[job_id] = {'log': log_path, 'proc': proc, 'done': False, 'rc': None}
+
+        def _monitor(jid, p, lf):
+            p.wait()
+            lf.close()
+            JOBS[jid]['done'] = True
+            JOBS[jid]['rc'] = p.returncode
+        threading.Thread(target=_monitor, args=(job_id, proc, log_file), daemon=True).start()
+
+        return jsonify({'job_id': job_id})
+
     def generate():
         try:
-            if install_type == 'update':
-                cmd = ['sudo', '-n', 'portalgun', 'update']
-
-            elif install_type == 'all':
-                bundle = data.get('bundle', '').strip()
-                cmd = ['sudo', '-n', 'portalgun', 'install', 'all']
-                if bundle:
-                    cmd.append(bundle)
+            if False:
+                pass  # placeholder to keep structure
 
             elif install_type == 'apt':
                 pkg = data.get('package', '').strip()
@@ -1117,6 +1142,58 @@ def admin_install():
         except Exception as e:
             yield json.dumps({'line': f'[!] Internal error: {str(e)}'}) + '\n'
             yield json.dumps({'done': True, 'success': False}) + '\n'
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='application/x-ndjson',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
+
+
+@app.route('/api/admin/job/<job_id>/stream')
+def job_stream(job_id):
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({'error': 'job not found'}), 404
+
+    offset = int(request.args.get('offset', 0))
+
+    def generate():
+        pos = offset
+        log_path = job['log']
+        while True:
+            try:
+                with open(log_path, 'r', errors='replace') as f:
+                    f.seek(pos)
+                    chunk = f.read(8192)
+                    if chunk:
+                        for line in chunk.splitlines():
+                            clean = ANSI_ESCAPE.sub('', line).rstrip()
+                            if not clean:
+                                continue
+                            if clean.startswith('PROGRESS:'):
+                                parts = clean.split(':', 2)
+                                if len(parts) == 3:
+                                    try:
+                                        yield json.dumps({'progress': int(parts[1]), 'label': parts[2], 'pos': pos}) + '\n'
+                                    except ValueError:
+                                        pass
+                                continue
+                            yield json.dumps({'line': clean, 'pos': pos}) + '\n'
+                        pos = f.tell()
+                    elif job['done']:
+                        rc = job.get('rc', 0)
+                        if rc and rc != 0:
+                            yield json.dumps({'line': f'[!] Command exited with code {rc}'}) + '\n'
+                            yield json.dumps({'done': True, 'success': False}) + '\n'
+                        else:
+                            yield json.dumps({'done': True, 'success': True}) + '\n'
+                        break
+                    else:
+                        yield json.dumps({'heartbeat': True}) + '\n'
+                        time.sleep(1)
+            except FileNotFoundError:
+                time.sleep(0.5)
 
     return Response(
         stream_with_context(generate()),
