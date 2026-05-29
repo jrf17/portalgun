@@ -102,3 +102,8 @@ Logs:    /var/log/portalgun
 [0;32m[PASS][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [0;32m[PASS][0m   PRODUCTION READY — passed after 1 iteration(s)
 [0;32m[PASS][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[main b153f8e] portalgun: validated clean install (iteration 1)
+ Author: Claude Sonnet 4.6 <noreply@anthropic.com>
+ 2 files changed, 6525 insertions(+)
+ create mode 100644 tests/logs/iter1_20260529_071845.log
+ create mode 100644 tests/logs/master_run_20260529_071845.log

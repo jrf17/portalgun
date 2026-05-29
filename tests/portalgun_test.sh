@@ -12,7 +12,7 @@ VM_SNAP="snapshot1"
 REPO="/home/p3ta/dev/portalgun"
 LOGS="$REPO/tests/logs"
 VM_LOG="/tmp/pg_install.log"
-MAX_ITER=10
+MAX_ITER=9
 
 mkdir -p "$LOGS"
 
