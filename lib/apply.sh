@@ -75,10 +75,12 @@ apply_bundle() {
                         # "Setting up nmap (1.2.3)..." or "Unpacking nmap (1.2.3)..."
                         pkg_name=$(echo "$line" | sed 's/^Setting up //;s/^Unpacking //' | grep -oE '^[a-z][a-z0-9.+_-]+')
                         apt_done=$(( apt_done + 1 ))
-                        # apt occupies 2–34% — scale within that range
-                        local pct=$(( 2 + ( apt_done * 32 / apt_total ) ))
-                        _progress "$pct" "Phase 1: apt [$apt_done/$apt_total] $pkg_name"
-                        printf "  ${BLUE}[apt]${NC} [%d/%d] %s\n" "$apt_done" "$apt_total" "$pkg_name"
+                        # apt occupies 2–34% — cap at total to avoid overflow
+                        local display_done=$(( apt_done > apt_total ? apt_total : apt_done ))
+                        local pct=$(( 2 + ( display_done * 32 / apt_total ) ))
+                        [ "$pct" -gt 34 ] && pct=34
+                        _progress "$pct" "Phase 1: apt [$display_done/$apt_total] $pkg_name"
+                        printf "  ${BLUE}[apt]${NC} [%d/%d] %s\n" "$display_done" "$apt_total" "$pkg_name"
                     fi
                 done
 
