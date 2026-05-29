@@ -72,7 +72,8 @@ apply_bundle() {
                 while IFS= read -r line; do
                     if echo "$line" | grep -qE "^Setting up|^Unpacking"; then
                         local pkg_name
-                        pkg_name=$(echo "$line" | grep -oE '[a-z][a-z0-9.+_-]+' | head -1)
+                        # "Setting up nmap (1.2.3)..." or "Unpacking nmap (1.2.3)..."
+                        pkg_name=$(echo "$line" | sed 's/^Setting up //;s/^Unpacking //' | grep -oE '^[a-z][a-z0-9.+_-]+')
                         apt_done=$(( apt_done + 1 ))
                         # apt occupies 2–34% — scale within that range
                         local pct=$(( 2 + ( apt_done * 32 / apt_total ) ))
