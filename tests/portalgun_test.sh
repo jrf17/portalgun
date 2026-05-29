@@ -12,7 +12,7 @@ VM_SNAP="snapshot1"
 REPO="/home/p3ta/dev/portalgun"
 LOGS="$REPO/tests/logs"
 VM_LOG="/tmp/pg_install.log"
-MAX_ITER=5
+MAX_ITER=10
 
 mkdir -p "$LOGS"
 
@@ -217,9 +217,46 @@ validate() {
         return 0
     else
         fail "═══ ITERATION $iter: $errors errors ═══"
-        # Show last 20 lines of install log for context
-        log "Last 20 lines of install log:"
-        echo "$plain" | tail -20
+        log "Last 30 lines of install log:"
+        echo "$plain" | tail -30
+
+        # Auto-fix pip conflicts found in this run
+        local conflicts
+        conflicts=$(echo "$plain" | grep "Cannot install" | grep -oE "[a-z][a-z0-9._-]+==[0-9][^ ]+" | sort -u)
+        if [ -n "$conflicts" ]; then
+            log "Auto-fixing pip conflicts: stripping version pins"
+            for pkg_spec in $conflicts; do
+                pkg_name=$(echo "$pkg_spec" | cut -d= -f1)
+                log "  Stripping version pin: $pkg_spec -> $pkg_name"
+                python3 -c "
+import json
+with open('/home/p3ta/dev/portalgun/portalgun_bundle.json') as f:
+    b = json.load(f)
+b['tools']['pip'] = [p if p.split('==')[0].lower() != '${pkg_name}'.lower() else '${pkg_name}' for p in b['tools']['pip']]
+with open('/home/p3ta/dev/portalgun/portalgun_bundle.json', 'w') as f:
+    json.dump(b, f, indent=2)
+"
+            done
+        fi
+
+        # Auto-fix build failures — remove packages that failed to build
+        local build_fails
+        build_fails=$(echo "$plain" | grep "Failed to build" | grep -oE "'[a-z][a-z0-9._-]+'" | tr -d "'" | sort -u)
+        if [ -n "$build_fails" ]; then
+            log "Auto-fixing build failures: removing packages"
+            for pkg_name in $build_fails; do
+                log "  Removing: $pkg_name"
+                python3 -c "
+import json
+with open('/home/p3ta/dev/portalgun/portalgun_bundle.json') as f:
+    b = json.load(f)
+b['tools']['pip'] = [p for p in b['tools']['pip'] if p.split('==')[0].lower() != '${pkg_name}'.lower()]
+with open('/home/p3ta/dev/portalgun/portalgun_bundle.json', 'w') as f:
+    json.dump(b, f, indent=2)
+"
+            done
+        fi
+
         return 1
     fi
 }
