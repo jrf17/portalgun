@@ -1039,8 +1039,17 @@ def admin_install():
             )
             for line in iter(proc.stdout.readline, ''):
                 clean = ANSI_ESCAPE.sub('', line).rstrip()
-                if clean:
-                    yield json.dumps({'line': clean}) + '\n'
+                if not clean:
+                    continue
+                if clean.startswith('PROGRESS:'):
+                    parts = clean.split(':', 2)
+                    if len(parts) == 3:
+                        try:
+                            yield json.dumps({'progress': int(parts[1]), 'label': parts[2]}) + '\n'
+                        except ValueError:
+                            pass
+                    continue
+                yield json.dumps({'line': clean}) + '\n'
             proc.stdout.close()
             proc.wait()
             rc = proc.returncode

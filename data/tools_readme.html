@@ -571,6 +571,27 @@
 
             <!-- Live output terminal -->
             <div id="admin-output-wrap" style="display:none;margin-top:20px;">
+
+                <!-- Progress bar (hidden until install all / update starts) -->
+                <div id="progress-wrap" style="display:none;margin-bottom:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                        <span id="progress-label" style="color:var(--text2);font-size:0.82em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Initializing...</span>
+                        <span id="progress-pct" style="color:#cba6f7;font-size:0.82em;font-weight:bold;margin-left:12px;">0%</span>
+                    </div>
+                    <div style="background:#1e1e2e;border-radius:8px;height:14px;overflow:hidden;border:1px solid var(--border);">
+                        <div id="progress-bar"
+                             style="height:100%;width:0%;border-radius:8px;
+                                    background:linear-gradient(90deg,#89b4fa,#cba6f7);
+                                    transition:width 0.4s ease;box-shadow:0 0 8px rgba(137,180,250,0.4);"></div>
+                    </div>
+                    <div id="progress-phases" style="display:flex;margin-top:5px;gap:2px;font-size:0.7em;color:var(--text2);">
+                        <span style="flex:35;text-align:center;border-top:2px solid #89b4fa;padding-top:2px;">apt 35%</span>
+                        <span style="flex:45;text-align:center;border-top:2px solid #a6e3a1;padding-top:2px;">github 45%</span>
+                        <span style="flex:15;text-align:center;border-top:2px solid #f9e2af;padding-top:2px;">pip 15%</span>
+                        <span style="flex:5;text-align:center;border-top:2px solid #f38ba8;padding-top:2px;">cargo 5%</span>
+                    </div>
+                </div>
+
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <span style="color:var(--text2);font-size:0.82em;">Output</span>
                     <button onclick="clearAdminOutput()"
@@ -1918,6 +1939,26 @@ function adminOutputLine(line) {
 
 function clearAdminOutput() {
     document.getElementById('admin-output').innerHTML = '';
+    setProgress(0, '', false);
+}
+
+function setProgress(pct, label, show) {
+    const wrap = document.getElementById('progress-wrap');
+    const bar  = document.getElementById('progress-bar');
+    const pctEl = document.getElementById('progress-pct');
+    const lblEl = document.getElementById('progress-label');
+    if (!wrap) return;
+    if (show === false) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    bar.style.width = pct + '%';
+    pctEl.textContent = pct + '%';
+    if (label) lblEl.textContent = label;
+    // Color shift: blue→purple→green as progress advances
+    const colors = pct < 35 ? '#89b4fa,#74c7ec'
+                 : pct < 80 ? '#a6e3a1,#cba6f7'
+                 : pct < 95 ? '#f9e2af,#fab387'
+                             : '#a6e3a1,#94e2d5';
+    bar.style.background = `linear-gradient(90deg,${colors})`;
 }
 
 function setInstallBusy(type, busy) {
@@ -1964,6 +2005,7 @@ async function runInstall(type) {
     setInstallBusy(type, true);
     const label = type === 'all' ? 'portalgun install all' : type === 'update' ? 'portalgun update' : (payload.package || payload.url);
     adminOutputLine(`[*] Starting ${type} install: ${label}`);
+    if (type === 'all' || type === 'update') setProgress(0, 'Initializing...', true);
 
     try {
         const resp = await fetch('/api/admin/install', {
@@ -1992,11 +2034,19 @@ async function runInstall(type) {
                 if (!ln.trim()) continue;
                 try {
                     const msg = JSON.parse(ln);
-                    if (msg.line !== undefined) adminOutputLine(msg.line);
+                    if (msg.progress !== undefined) {
+                        setProgress(msg.progress, msg.label, true);
+                    } else if (msg.line !== undefined) {
+                        adminOutputLine(msg.line);
+                    }
                     if (msg.done) {
-                        adminOutputLine(msg.success
-                            ? '[+] Install complete.'
-                            : '[!] Install failed — see output above.');
+                        if (msg.success) {
+                            setProgress(100, 'Installation complete!', true);
+                            adminOutputLine('[+] Install complete.');
+                        } else {
+                            setProgress(0, '', false);
+                            adminOutputLine('[!] Install failed — see output above.');
+                        }
                         setInstallBusy(type, false);
                     }
                 } catch (_) { adminOutputLine(ln); }
