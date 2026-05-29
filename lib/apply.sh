@@ -58,7 +58,17 @@ apply_bundle() {
         print_status "  $apt_skip already installed, ${#apt_needed[@]} to install"
 
         if [ ${#apt_needed[@]} -gt 0 ]; then
-            DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_needed[@]}" 2>&1 | tail -5
+            local apt_done=0 apt_total=${#apt_needed[@]}
+            # Stream apt output — filter for package setting-up lines so user sees progress
+            DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_needed[@]}" 2>&1 | \
+                while IFS= read -r line; do
+                    if echo "$line" | grep -q "^Setting up\|^Unpacking"; then
+                        local pkg_name
+                        pkg_name=$(echo "$line" | grep -oE '[a-z][a-z0-9.+_-]+' | head -1)
+                        apt_done=$(( apt_done + 1 ))
+                        printf "  ${BLUE}[apt]${NC} [%d/%d] %s\n" "$apt_done" "$apt_total" "$pkg_name"
+                    fi
+                done
             # Register newly installed ones
             for pkg in "${apt_needed[@]}"; do
                 if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
