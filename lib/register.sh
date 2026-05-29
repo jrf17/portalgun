@@ -115,13 +115,25 @@ register_all() {
     if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
         local pip_cmd
         pip_cmd=$(command -v pip3 || command -v pip)
-        print_status "Scanning pip packages..."
+        print_status "Scanning pip packages (excluding debian/system packages)..."
 
+        # Only include packages installed by pip, not by debian apt
+        # Debian packages live in /usr/lib/python3/dist-packages — exclude those
         while IFS= read -r line; do
             [ -z "$line" ] && continue
             local pkg_name pkg_ver
             pkg_name=$(echo "$line" | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-')
             pkg_ver=$(echo "$line" | cut -d= -f3)
+
+            # Skip packages with no version (editable installs etc)
+            [ -z "$pkg_ver" ] && continue
+
+            # Skip if installed into debian system path (not a real pip install)
+            local pkg_loc
+            pkg_loc=$("$pip_cmd" show "$pkg_name" 2>/dev/null | grep "^Location:" | awk '{print $2}')
+            if echo "$pkg_loc" | grep -q "/usr/lib/python3/dist-packages\|/usr/lib/python3/"; then
+                continue
+            fi
 
             local safe_id
             safe_id=$(echo "$pkg_name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '_')
