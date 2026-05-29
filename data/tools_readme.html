@@ -2034,6 +2034,7 @@ async function runInstall(type) {
                 if (!ln.trim()) continue;
                 try {
                     const msg = JSON.parse(ln);
+                    if (msg.heartbeat) continue;
                     if (msg.progress !== undefined) {
                         setProgress(msg.progress, msg.label, true);
                     } else if (msg.line !== undefined) {

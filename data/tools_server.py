@@ -1032,24 +1032,36 @@ def admin_install():
                 yield json.dumps({'done': True, 'success': False}) + '\n'
                 return
 
-            # Run main install command, stream output
+            # Run main install command, stream output with heartbeats
+            # so the browser connection stays alive during silent phases (e.g. apt)
+            import select
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1
             )
-            for line in iter(proc.stdout.readline, ''):
-                clean = ANSI_ESCAPE.sub('', line).rstrip()
-                if not clean:
-                    continue
-                if clean.startswith('PROGRESS:'):
-                    parts = clean.split(':', 2)
-                    if len(parts) == 3:
-                        try:
-                            yield json.dumps({'progress': int(parts[1]), 'label': parts[2]}) + '\n'
-                        except ValueError:
-                            pass
-                    continue
-                yield json.dumps({'line': clean}) + '\n'
+            while True:
+                ready = select.select([proc.stdout], [], [], 10.0)[0]
+                if ready:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    clean = ANSI_ESCAPE.sub('', line).rstrip()
+                    if not clean:
+                        continue
+                    if clean.startswith('PROGRESS:'):
+                        parts = clean.split(':', 2)
+                        if len(parts) == 3:
+                            try:
+                                yield json.dumps({'progress': int(parts[1]), 'label': parts[2]}) + '\n'
+                            except ValueError:
+                                pass
+                        continue
+                    yield json.dumps({'line': clean}) + '\n'
+                else:
+                    # No output for 10s — send heartbeat to keep connection alive
+                    if proc.poll() is not None:
+                        break
+                    yield json.dumps({'heartbeat': True}) + '\n'
             proc.stdout.close()
             proc.wait()
             rc = proc.returncode
