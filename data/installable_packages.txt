@@ -60,6 +60,7 @@ fastjar
 feh
 flameshot
 fonts-crosextra-carlito
+freetds-dev
 fzf
 g++-14
 g++-14-x86-64-linux-gnu
@@ -96,6 +97,7 @@ goshs
 gospider
 gqrx-sdr
 gr-air-modes
+graphviz
 gr-fosphor
 gr-funcube
 grim
@@ -180,6 +182,7 @@ libboost-url-dev
 libboost-wave-dev
 libbsd-dev
 libbz2-dev
+libcairo2-dev
 libcapi20-3t64
 libcdi-api-java
 libckyapplet1t64
@@ -199,6 +202,7 @@ libcompel1
 libcppunit-1.15-0
 libcppunit-dev
 libcrypt-dev
+libcurl4-openssl-dev
 libdbd-mariadb-perl
 libdevel-callchecker-perl
 libdrm-dev
@@ -212,6 +216,7 @@ libevent-dev
 libevent-extra-2.1-7t64
 libfabric1
 libfec0
+libffi-dev
 libfftw3-bin
 libfftw3-dev
 libfftw3-long3
@@ -254,6 +259,7 @@ libgnuradio-video-sdl3.10.12
 libgnuradio-vocoder3.10.12
 libgnuradio-wavelet3.10.12
 libgnuradio-zeromq3.10.12
+libgraphviz-dev
 libgsl28
 libgslcblas0
 libgsm1-dev
@@ -282,6 +288,7 @@ libintl-perl
 libintl-xs-perl
 libjansi-java
 libjcommander-java
+libjpeg-dev
 libjs-events
 libjs-inherits
 libjs-is-typedarray
@@ -303,6 +310,7 @@ libllvm19
 liblms7compact0
 libltdl-dev
 liblua5.2-0
+libmariadb-dev
 libmaven3-core-java
 libmaven-archiver-java
 libmaven-file-management-java
@@ -349,6 +357,7 @@ libplexus-io-java
 libplexus-sec-dispatcher-java
 libplexus-utils2-java
 libpmix2t64
+libpq-dev
 libproc-processtable-perl
 libpsm2-2
 libptytty0
@@ -381,6 +390,7 @@ libsnappy-java
 libsnappy-jni
 libsndio7.0
 libsoapysdr0.8
+libsodium-dev
 libsort-naturally-perl
 libspdlog1.15
 libspdlog-dev
@@ -416,8 +426,10 @@ libwxbase3.2-1t64
 libwxgtk3.2-1t64
 libwxgtk-gl3.2-1t64
 libxkbregistry0
+libxml2-dev
 libxmlunit-java
 libxpp3-java
+libxslt1-dev
 libxstring-perl
 libxtrx0
 libxtrxdsp0
@@ -425,6 +437,7 @@ libxtrxll0t64
 libxz-java
 libyaml-snake-java
 libz-mingw-w64
+libzmq3-dev
 limesuite-udev
 linkedin2username
 llvm-19
@@ -844,6 +857,7 @@ pandoc-data
 pipewire-module-xrdp
 pkgconf
 pkgconf-bin
+pkg-config
 proxmark3
 proxmark3-common
 proxmark3-firmwares
@@ -998,3 +1012,4 @@ xtrx-dkms
 yersinia
 yudit-common
 zerofree
+zlib1g-dev
