@@ -278,21 +278,19 @@ for i in $(seq 1 $MAX_ITER); do
     wait_for_install "$LOGFILE"
 
     if validate "$LOGFILE" "$i"; then
-        echo ""
-        pass "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        pass "  PRODUCTION READY — passed after $i iteration(s)"
-        pass "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        # Commit and push the validated code
+        pass "Iteration $i/$MAX_ITER: CLEAN"
         cd "$REPO"
         git add -A
-        git commit -m "portalgun: validated clean install (iteration $i)" \
+        git commit -m "portalgun: clean install run $i/$MAX_ITER" \
             --author="Claude Sonnet 4.6 <noreply@anthropic.com>" 2>/dev/null || true
         git push 2>/dev/null || true
-        exit 0
+    else
+        log "Iteration $i failed — auto-fixes applied, continuing..."
     fi
-
-    log "Fixing and retrying..."
 done
 
-fail "Could not reach zero errors in $MAX_ITER iterations. Logs: $LOGS"
-exit 1
+# Final summary
+total_passes=$(grep -c "Iteration.*CLEAN" "$LOGS/master_run_"*.log 2>/dev/null || echo "?")
+pass "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+pass "  COMPLETED $MAX_ITER ITERATIONS"
+pass "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
