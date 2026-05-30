@@ -12,10 +12,14 @@ _progress() {
 }
 
 apply_bundle() {
-    local bundle_file="${1:-}"
-    # Phase flags — parse --phases=apt,github,pip,cargo or individual --only-pip etc
+    # Separate bundle file from flags — first non-flag arg is the bundle path
+    local bundle_file=""
     local run_apt=1 run_github=1 run_pip=1 run_cargo=1
     for arg in "$@"; do
+        if [[ "$arg" != --* ]] && [ -z "$bundle_file" ]; then
+            bundle_file="$arg"
+            continue
+        fi
         case "$arg" in
             --only-apt)    run_github=0; run_pip=0; run_cargo=0 ;;
             --only-github) run_apt=0;    run_pip=0; run_cargo=0 ;;

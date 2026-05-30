@@ -98,7 +98,7 @@ case "$cmd" in
             all)
                 shift
                 source "$PORTALGUN_LIB/apply.sh"
-                apply_bundle "${1:-}"
+                apply_bundle "$@"
                 ;;
             ""|-h|--help)
                 usage; exit 0
