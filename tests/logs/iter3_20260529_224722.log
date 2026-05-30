@@ -6414,4 +6414,10 @@ PROGRESS:95:Phase 3: pip complete
 PROGRESS:96:Phase 4: Installing cargo tools...
 [0;34m[*][0m Phase 4: cargo packages (1)
 PROGRESS:99:Phase 4: cargo [1/1] cargo-update
-  [0;34m[cargo][0m cargo-update ... 
+  [0;34m[cargo][0m cargo-update ... [0;32mok[0m
+
+[0;34m[*][0m cargo: 1 installed, 0 skipped, 0 failed
+
+[0;32m[+][0m Updated web manifest → /opt/tools-docs/portalgun_tools.json
+PROGRESS:100:Installation complete!
+[0;32m[+][0m Done. Run 'portalgun status' to verify.

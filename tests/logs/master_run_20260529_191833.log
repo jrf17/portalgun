@@ -535,3 +535,23 @@ Logs:    /var/log/portalgun
 [0;34m[TEST 01:02:58][0m [135m] Phase 3:   Installing pip batch 11/17...
 [0;34m[TEST 01:03:58][0m [136m] Phase 3: ERROR: No matching distribution found for wfuzz==3.1.0
 [0;34m[TEST 01:04:58][0m [137m] Phase 4:   [cargo] cargo-update ... 
+[0;34m[TEST 01:05:59][0m Install complete after 137m.
+[0;34m[TEST 01:05:59][0m === Validating iteration 3 ===
+[0;32m[PASS][0m apt phase completed
+[0;32m[PASS][0m github: 186 installed, 0 failed
+/home/p3ta/dev/portalgun/tests/portalgun_test.sh: line 170: [: 0
+0: integer expected
+[0;32m[PASS][0m pip: no PEP 668 blocks
+[0;32m[PASS][0m pip phase completed
+[0;32m[PASS][0m jq: clean
+[0;32m[PASS][0m install: reached completion
+  apt tools:     1017
+  github tools:  185 (build_failed: 30)
+  pip packages:  846
+  cargo tools:   1
+  total:         2049
+  installers/install_github_tools.sh: present
+[0;32m[PASS][0m registry: 2049 tools
+
+[0;32m[PASS][0m ═══ ITERATION 3: ZERO ERRORS — PRODUCTION READY ═══
+[0;32m[PASS][0m Iteration 3/9: CLEAN
