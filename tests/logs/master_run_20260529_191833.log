@@ -642,3 +642,23 @@ Logs:    /var/log/portalgun
 [0;34m[TEST 01:38:07][0m [32m] Phase 3:   Installing pip batch 15/17...
 [0;34m[TEST 01:39:08][0m [33m] Phase 4:   [cargo] cargo-update ... 
 [0;34m[TEST 01:40:08][0m [34m] Phase 4:   [cargo] cargo-update ... 
+[0;34m[TEST 01:41:08][0m Install complete after 34m.
+[0;34m[TEST 01:41:08][0m === Validating iteration 4 ===
+[0;32m[PASS][0m apt phase completed
+[0;32m[PASS][0m github: 186 installed, 0 failed
+/home/p3ta/dev/portalgun/tests/portalgun_test.sh: line 170: [: 0
+0: integer expected
+[0;32m[PASS][0m pip: no PEP 668 blocks
+[0;32m[PASS][0m pip phase completed
+[0;32m[PASS][0m jq: clean
+[0;32m[PASS][0m install: reached completion
+  apt tools:     1017
+  github tools:  185 (build_failed: 30)
+  pip packages:  846
+  cargo tools:   1
+  total:         2049
+  installers/install_github_tools.sh: present
+[0;32m[PASS][0m registry: 2049 tools
+
+[0;32m[PASS][0m ═══ ITERATION 4: ZERO ERRORS — PRODUCTION READY ═══
+[0;32m[PASS][0m Iteration 4/9: CLEAN
