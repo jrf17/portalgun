@@ -12,7 +12,7 @@ PORTALGUN_WEB_DIR="${PORTALGUN_WEB_DIR:-/opt/tools-docs}"
 # Source repo dir — where the merged portalgun repo lives (with installers/ and data/).
 # Auto-detect: try /home/$USER/portalgun, SUDO_USER home, /root/portalgun.
 if [ -z "$PORTALGUN_REPO_DIR" ]; then
-    for candidate in "/home/${SUDO_USER:-$USER}/portalgun" "$HOME/portalgun" "/root/portalgun"; do
+    for candidate in "/home/${SUDO_USER:-$USER}/portalgun" "$HOME/portalgun" "/root/portalgun" "/opt/portalgun"; do
         if [ -d "$candidate/installers" ] && [ -d "$candidate/data" ]; then
             PORTALGUN_REPO_DIR="$candidate"
             break
@@ -20,6 +20,9 @@ if [ -z "$PORTALGUN_REPO_DIR" ]; then
     done
     PORTALGUN_REPO_DIR="${PORTALGUN_REPO_DIR:-/home/kali/portalgun}"
 fi
+
+# Bundle search path — also check /opt/portalgun directly
+export PORTALGUN_BUNDLE_SEARCH="/opt/portalgun/portalgun_bundle.json /home/kali/portalgun/portalgun_bundle.json"
 export PORTALGUN_ROOT PORTALGUN_LIB PORTALGUN_REGISTRY PORTALGUN_LOG_DIR \
        PORTALGUN_TOOLS_BASE PORTALGUN_WEB_DIR PORTALGUN_REPO_DIR
 

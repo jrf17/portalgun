@@ -40,6 +40,8 @@ apply_bundle() {
         for candidate in \
             "$PORTALGUN_REPO_DIR/portalgun_bundle.json" \
             "$PORTALGUN_REPO_DIR/data/portalgun_bundle.json" \
+            "/opt/portalgun/portalgun_bundle.json" \
+            "/home/kali/portalgun/portalgun_bundle.json" \
             "./portalgun_bundle.json"; do
             if [ -f "$candidate" ]; then
                 bundle_file="$candidate"

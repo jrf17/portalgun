@@ -64,6 +64,12 @@ chmod 755 "$REGISTRY_DIR" "$LOG_DIR"
 print_success "Registry dir: $REGISTRY_DIR"
 print_success "Log dir:      $LOG_DIR"
 
+# Copy bundle to /opt/portalgun so it's always findable regardless of $HOME
+if [ -f "$SRC_ROOT/portalgun_bundle.json" ]; then
+    cp "$SRC_ROOT/portalgun_bundle.json" "$INSTALL_ROOT/portalgun_bundle.json"
+    print_success "Bundle → $INSTALL_ROOT/portalgun_bundle.json"
+fi
+
 # ─── Pentest venv PATH — add /opt/pentest-venv/bin system-wide ───────
 cat > /etc/profile.d/pentest-venv.sh << 'PROFILE'
 # portalgun: pentest python venv

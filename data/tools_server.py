@@ -993,6 +993,15 @@ def admin_install():
             bundle = data.get('bundle', '').strip()
             phases = data.get('phases', [])
             cmd = ['sudo', '-n', 'portalgun', 'install', 'all']
+            # Always pass bundle path explicitly so it works regardless of $HOME
+            if not bundle:
+                for candidate in [
+                    '/opt/portalgun/portalgun_bundle.json',
+                    '/home/kali/portalgun/portalgun_bundle.json',
+                ]:
+                    if os.path.exists(candidate):
+                        bundle = candidate
+                        break
             if bundle:
                 cmd.append(bundle)
             if phases and len(phases) < 4:
