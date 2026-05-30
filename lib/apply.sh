@@ -143,49 +143,54 @@ apply_bundle() {
         echo ""
     fi
 
-    # ── pip (80–95%) ─────────────────────────────────────────────────
+    # ── pip (80–95%) — installed into shared venv /opt/pentest-venv ──
+    local VENV="/opt/pentest-venv"
+    local VENV_PIP="$VENV/bin/pip"
+
     if [ "$pip_count" -gt 0 ]; then
-        _progress 81 "Phase 3: Installing pip packages..."
-        print_status "Phase 3: pip packages ($pip_count)"
+        _progress 81 "Phase 3: Setting up /opt/pentest-venv..."
+        print_status "Phase 3: pip packages ($pip_count) → $VENV"
 
-        local pip_cmd
-        pip_cmd=$(command -v pip3 || command -v pip || echo "")
-        if [ -z "$pip_cmd" ]; then
-            print_warning "pip not found — skipping pip phase"
-        else
-            local pip_needed=()
-            while IFS= read -r pkg_spec; do
-                [ -z "$pkg_spec" ] && continue
-                local pkg_name safe_id
-                pkg_name=$(echo "$pkg_spec" | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-                safe_id=$(echo "$pkg_name" | tr -cs 'a-z0-9._-' '_')
-                registry_exists pip "$safe_id" || pip_needed+=("$pkg_spec")
-            done < <(jq -r '(.tools.pip // [])[]' "$bundle_file")
+        # Create venv if it doesn't exist
+        if [ ! -f "$VENV/bin/pip" ]; then
+            print_status "  Creating venv at $VENV..."
+            python3 -m venv "$VENV"
+            "$VENV_PIP" install --quiet --upgrade pip setuptools wheel
+        fi
 
-            local pip_skip=$(( pip_count - ${#pip_needed[@]} ))
-            local pip_total_batches=$(( (${#pip_needed[@]} + 49) / 50 ))
-            print_status "  $pip_skip already installed, ${#pip_needed[@]} to install ($pip_total_batches batches)"
+        local pip_needed=()
+        while IFS= read -r pkg_spec; do
+            [ -z "$pkg_spec" ] && continue
+            local pkg_name safe_id
+            pkg_name=$(echo "$pkg_spec" | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            safe_id=$(echo "$pkg_name" | tr -cs 'a-z0-9._-' '_')
+            registry_exists pip "$safe_id" || pip_needed+=("$pkg_spec")
+        done < <(jq -r '(.tools.pip // [])[]' "$bundle_file")
 
-            if [ ${#pip_needed[@]} -gt 0 ]; then
-                local batch=() batch_num=0
-                for pkg_spec in "${pip_needed[@]}"; do
-                    batch+=("$pkg_spec")
-                    if [ ${#batch[@]} -ge 50 ]; then
-                        (( batch_num++ )) || true
-                        local pct=$(( 81 + ( batch_num * 13 / pip_total_batches ) ))
-                        _progress "$pct" "Phase 3: pip [batch $batch_num/$pip_total_batches]"
-                        printf "  Installing pip batch %d/%d...\n" "$batch_num" "$pip_total_batches"
-                        "$pip_cmd" install --quiet --break-system-packages "${batch[@]}" 2>&1 | tail -2
-                        batch=()
-                    fi
-                done
-                if [ ${#batch[@]} -gt 0 ]; then
+        local pip_skip=$(( pip_count - ${#pip_needed[@]} ))
+        local pip_total_batches=$(( (${#pip_needed[@]} + 49) / 50 ))
+        print_status "  $pip_skip already installed, ${#pip_needed[@]} to install ($pip_total_batches batches)"
+
+        if [ ${#pip_needed[@]} -gt 0 ]; then
+            local batch=() batch_num=0
+            for pkg_spec in "${pip_needed[@]}"; do
+                batch+=("$pkg_spec")
+                if [ ${#batch[@]} -ge 50 ]; then
                     (( batch_num++ )) || true
                     local pct=$(( 81 + ( batch_num * 13 / pip_total_batches ) ))
                     _progress "$pct" "Phase 3: pip [batch $batch_num/$pip_total_batches]"
                     printf "  Installing pip batch %d/%d...\n" "$batch_num" "$pip_total_batches"
-                    "$pip_cmd" install --quiet --break-system-packages "${batch[@]}" 2>&1 | tail -2
+                    "$VENV_PIP" install --quiet "${batch[@]}" 2>&1 | grep -E "^ERROR|Cannot install|Failed to build" || true
+                    batch=()
                 fi
+            done
+            if [ ${#batch[@]} -gt 0 ]; then
+                (( batch_num++ )) || true
+                local pct=$(( 81 + ( batch_num * 13 / pip_total_batches ) ))
+                _progress "$pct" "Phase 3: pip [batch $batch_num/$pip_total_batches]"
+                printf "  Installing pip batch %d/%d...\n" "$batch_num" "$pip_total_batches"
+                "$VENV_PIP" install --quiet "${batch[@]}" 2>&1 | grep -E "^ERROR|Cannot install|Failed to build" || true
+            fi
 
                 while IFS= read -r pkg_spec; do
                     [ -z "$pkg_spec" ] && continue

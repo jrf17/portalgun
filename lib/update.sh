@@ -98,8 +98,13 @@ update_all() {
     echo ""
 
     # ── Phase 3: pip ─────────────────────────────────────────────────
+    local VENV="/opt/pentest-venv"
     local pip_cmd
-    pip_cmd=$(command -v pip3 || command -v pip || echo "")
+    if [ -f "$VENV/bin/pip" ]; then
+        pip_cmd="$VENV/bin/pip"
+    else
+        pip_cmd=$(command -v pip3 || command -v pip || echo "")
+    fi
     if [ -n "$pip_cmd" ]; then
         print_status "Phase 3: pip upgrade all"
         # pip list --outdated then upgrade each; --upgrade-all not supported natively
@@ -118,7 +123,7 @@ update_all() {
             pip_ok=1
         else
             print_status "pip: $outdated_count outdated packages, upgrading..."
-            if "$pip_cmd" install --quiet --break-system-packages --upgrade "${outdated_pkgs[@]}" 2>&1 | tail -3; then
+            if "$pip_cmd" install --quiet --upgrade "${outdated_pkgs[@]}" 2>&1 | tail -3; then
                 print_success "pip: $outdated_count packages upgraded"
                 pip_ok=1
                 # Update registry versions for upgraded packages

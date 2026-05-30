@@ -112,10 +112,18 @@ register_all() {
     # ── pip: snapshot all installed pip packages ──────────────────────
     local pip_added=0 pip_skipped=0
 
-    if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
-        local pip_cmd
-        pip_cmd=$(command -v pip3 || command -v pip)
-        print_status "Scanning pip packages (excluding debian/system packages)..."
+    local VENV="/opt/pentest-venv"
+    local pip_cmd
+    if [ -f "$VENV/bin/pip" ]; then
+        pip_cmd="$VENV/bin/pip"
+    elif command -v pip3 >/dev/null 2>&1; then
+        pip_cmd=$(command -v pip3)
+    elif command -v pip >/dev/null 2>&1; then
+        pip_cmd=$(command -v pip)
+    fi
+
+    if [ -n "$pip_cmd" ]; then
+        print_status "Scanning pip packages (${pip_cmd})..."
 
         # Only include packages installed by pip, not by debian apt
         # Debian packages live in /usr/lib/python3/dist-packages — exclude those

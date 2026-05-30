@@ -58,10 +58,28 @@ ln -sf "$INSTALL_ROOT/bin/portalgun" "$BIN_LINK"
 print_success "Linked $BIN_LINK → $INSTALL_ROOT/bin/portalgun"
 
 # ─── Registry + log dirs ────────────────────────────────────────────
-mkdir -p "$REGISTRY_DIR/apt" "$REGISTRY_DIR/github" "$LOG_DIR"
+mkdir -p "$REGISTRY_DIR/apt" "$REGISTRY_DIR/github" \
+         "$REGISTRY_DIR/pip" "$REGISTRY_DIR/cargo" "$LOG_DIR"
 chmod 755 "$REGISTRY_DIR" "$LOG_DIR"
 print_success "Registry dir: $REGISTRY_DIR"
 print_success "Log dir:      $LOG_DIR"
+
+# ─── Pentest venv PATH — add /opt/pentest-venv/bin system-wide ───────
+cat > /etc/profile.d/pentest-venv.sh << 'PROFILE'
+# portalgun: pentest python venv
+export PENTEST_VENV=/opt/pentest-venv
+if [ -d "$PENTEST_VENV/bin" ]; then
+    export PATH="$PENTEST_VENV/bin:$PATH"
+fi
+PROFILE
+chmod 644 /etc/profile.d/pentest-venv.sh
+
+# Allow sudo to find venv binaries
+if ! grep -q "pentest-venv" /etc/sudoers 2>/dev/null; then
+    echo 'Defaults secure_path="/opt/pentest-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' \
+        >> /etc/sudoers
+fi
+print_success "Pentest venv PATH → /etc/profile.d/pentest-venv.sh"
 
 # ─── Zsh completion ─────────────────────────────────────────────────
 if [ -d "$ZSH_COMP_DIR" ]; then
