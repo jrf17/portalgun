@@ -13,6 +13,28 @@ _progress() {
 
 apply_bundle() {
     local bundle_file="${1:-}"
+    # Phase flags — parse --phases=apt,github,pip,cargo or individual --only-pip etc
+    local run_apt=1 run_github=1 run_pip=1 run_cargo=1
+    for arg in "$@"; do
+        case "$arg" in
+            --only-apt)    run_github=0; run_pip=0; run_cargo=0 ;;
+            --only-github) run_apt=0;    run_pip=0; run_cargo=0 ;;
+            --only-pip)    run_apt=0;    run_github=0; run_cargo=0 ;;
+            --only-cargo)  run_apt=0;    run_github=0; run_pip=0 ;;
+            --skip-apt)    run_apt=0 ;;
+            --skip-github) run_github=0 ;;
+            --skip-pip)    run_pip=0 ;;
+            --skip-cargo)  run_cargo=0 ;;
+            --phases=*)
+                local phases="${arg#--phases=}"
+                run_apt=0; run_github=0; run_pip=0; run_cargo=0
+                echo "$phases" | grep -q "apt"    && run_apt=1
+                echo "$phases" | grep -q "github" && run_github=1
+                echo "$phases" | grep -q "pip"    && run_pip=1
+                echo "$phases" | grep -q "cargo"  && run_cargo=1
+                ;;
+        esac
+    done
 
     if [ -z "$bundle_file" ]; then
         for candidate in \
@@ -51,7 +73,7 @@ apply_bundle() {
     echo ""
 
     # ── APT (0–35%) ──────────────────────────────────────────────────
-    if [ "$apt_count" -gt 0 ]; then
+    if [ "$apt_count" -gt 0 ] && [ "$run_apt" -eq 1 ]; then
         _progress 1 "Phase 1: Resolving apt packages..."
         print_status "Phase 1: apt packages ($apt_count)"
 
@@ -106,7 +128,7 @@ apply_bundle() {
     fi
 
     # ── GitHub (35–80%) ──────────────────────────────────────────────
-    if [ "$github_count" -gt 0 ]; then
+    if [ "$github_count" -gt 0 ] && [ "$run_github" -eq 1 ]; then
         _progress 36 "Phase 2: Cloning GitHub tools..."
         print_status "Phase 2: github tools ($github_count)"
         local gh_ok=0 gh_skip=0 gh_fail=0 gh_done=0
@@ -147,7 +169,7 @@ apply_bundle() {
     local VENV="/opt/pentest-venv"
     local VENV_PIP="$VENV/bin/pip"
 
-    if [ "$pip_count" -gt 0 ]; then
+    if [ "$pip_count" -gt 0 ] && [ "$run_pip" -eq 1 ]; then
         _progress 81 "Phase 3: Setting up /opt/pentest-venv..."
         print_status "Phase 3: pip packages ($pip_count) → $VENV"
 
@@ -217,7 +239,7 @@ apply_bundle() {
     fi
 
     # ── cargo (95–100%) ──────────────────────────────────────────────
-    if [ "$cargo_count" -gt 0 ]; then
+    if [ "$cargo_count" -gt 0 ] && [ "$run_cargo" -eq 1 ]; then
         _progress 96 "Phase 4: Installing cargo tools..."
         print_status "Phase 4: cargo packages ($cargo_count)"
 

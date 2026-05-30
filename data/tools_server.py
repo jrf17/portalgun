@@ -991,9 +991,12 @@ def admin_install():
             cmd = ['sudo', '-n', 'portalgun', 'update']
         else:
             bundle = data.get('bundle', '').strip()
+            phases = data.get('phases', [])
             cmd = ['sudo', '-n', 'portalgun', 'install', 'all']
             if bundle:
                 cmd.append(bundle)
+            if phases and len(phases) < 4:
+                cmd.append(f"--phases={','.join(phases)}")
 
         job_id = str(uuid.uuid4())[:8]
         log_path = f'/tmp/pg_job_{job_id}.log'

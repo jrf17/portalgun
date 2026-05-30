@@ -452,7 +452,21 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
                 <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;">
                     <div style="font-weight:600;color:#d29922;margin-bottom:4px;">Install All</div>
-                    <div style="color:var(--text2);font-size:0.8em;margin-bottom:12px;">Install everything from <code>portalgun_bundle.json</code></div>
+                    <div style="color:var(--text2);font-size:0.8em;margin-bottom:8px;">Select phases to install:</div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:0.82em;cursor:pointer;color:var(--text);">
+                            <input type="checkbox" id="phase-apt" checked> apt
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:0.82em;cursor:pointer;color:var(--text);">
+                            <input type="checkbox" id="phase-github" checked> github
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:0.82em;cursor:pointer;color:var(--text);">
+                            <input type="checkbox" id="phase-pip" checked> pip
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:0.82em;cursor:pointer;color:var(--text);">
+                            <input type="checkbox" id="phase-cargo" checked> cargo
+                        </label>
+                    </div>
                     <button onclick="runInstall('all')" id="all-install-btn" class="action-btn green" style="width:100%;">&#9654; Install All</button>
                 </div>
                 <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;">
@@ -1977,7 +1991,12 @@ function setInstallBusy(type, busy) {
 
 async function runInstall(type) {
     const payloads = {
-        all:    () => ({ type: 'all' }),
+        all:    () => {
+            const phases = ['apt','github','pip','cargo'].filter(p =>
+                document.getElementById(`phase-${p}`)?.checked !== false
+            );
+            return { type: 'all', phases };
+        },
         update: () => ({ type: 'update' }),
         apt:    () => ({ type: 'apt',    package: document.getElementById('apt-pkg').value.trim() }),
         github: () => ({
