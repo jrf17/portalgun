@@ -176,7 +176,7 @@ validate() {
 
     # pip hard errors (conflicts, build failures, missing versions)
     local pip_errors
-    pip_errors=$(echo "$plain" | grep -E "^ERROR: Cannot install|^ERROR: Could not find a version|^ERROR: Failed to build|^ERROR: ResolutionImpossible" | grep -v "uninstall-no-record" | wc -l)
+    pip_errors=$(echo "$plain" | grep -E "^ERROR: Cannot install|^ERROR: Could not find a version|^ERROR: Failed to build|^ERROR: ResolutionImpossible|× Failed to build installable" | grep -v "uninstall-no-record" | wc -l)
     if [ "${pip_errors:-0}" -gt 0 ]; then
         fail "pip hard errors: $pip_errors"
         echo "$plain" | grep -E "^ERROR: Cannot install|^ERROR: Could not find a version|^ERROR: Failed to build|^ERROR: ResolutionImpossible" | head -10

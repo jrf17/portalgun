@@ -208,7 +208,7 @@ apply_bundle() {
                     local pct=$(( 81 + ( batch_num * 13 / pip_total_batches ) ))
                     _progress "$pct" "Phase 3: pip [batch $batch_num/$pip_total_batches]"
                     printf "  Installing pip batch %d/%d...\n" "$batch_num" "$pip_total_batches"
-                    "$VENV_PIP" install --quiet "${batch[@]}" 2>&1 | grep -E "^ERROR|Cannot install|Failed to build" || true
+                    "$VENV_PIP" install --quiet "${batch[@]}" 2>&1 | grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" || true
                     batch=()
                 fi
             done
