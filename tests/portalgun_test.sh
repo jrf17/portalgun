@@ -174,6 +174,17 @@ validate() {
         pass "pip: no PEP 668 blocks"
     fi
 
+    # pip hard errors (conflicts, build failures, missing versions)
+    local pip_errors
+    pip_errors=$(echo "$plain" | grep -E "^ERROR: Cannot install|^ERROR: Could not find a version|^ERROR: Failed to build|^ERROR: ResolutionImpossible" | grep -v "uninstall-no-record" | wc -l)
+    if [ "${pip_errors:-0}" -gt 0 ]; then
+        fail "pip hard errors: $pip_errors"
+        echo "$plain" | grep -E "^ERROR: Cannot install|^ERROR: Could not find a version|^ERROR: Failed to build|^ERROR: ResolutionImpossible" | head -10
+        errors=$(( errors + 1 ))
+    else
+        pass "pip: no hard errors"
+    fi
+
     # Pip phase
     if echo "$plain" | grep -q "pip phase complete"; then
         pass "pip phase completed"
