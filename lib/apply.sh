@@ -209,7 +209,6 @@ apply_bundle() {
                         registry_write pip "$safe_id" "$json"
                     fi
                 done < <(jq -r '(.tools.pip // [])[]' "$bundle_file")
-            fi
         fi
 
         _progress 95 "Phase 3: pip complete"
