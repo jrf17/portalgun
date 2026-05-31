@@ -2156,7 +2156,6 @@
       "pygexf==0.2.2",
       "pygithub==2.6.1",
       "pygments==2.19.2",
-      "pygraphviz==1.14",
       "pyhamcrest==2.1.0",
       "pyinotify==0.9.6",
       "pyinstaller-hooks-contrib==2026.4",
