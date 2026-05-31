@@ -1941,10 +1941,15 @@ function adminOutputLine(line) {
     document.getElementById('admin-output-wrap').style.display = 'block';
 
     let color = '#c9d1d9';
-    if (/^\[!\]|error:|failed|FAILED/i.test(line))  color = '#f85149';
-    else if (/^\[\+\]|installed|done|success/i.test(line)) color = '#3fb950';
-    else if (/^\[-\]|skip|already|warn/i.test(line)) color = '#8b949e';
-    else if (/^\[\*\]|cloning|building|compiling|fetching|detecting/i.test(line)) color = '#58a6ff';
+    // Red ONLY for real errors
+    if (/^\[!\] (Install failed|Request failed|HTTP [45]|Command exited with code [^0])|^ERROR:|× Failed to build/.test(line)) color = '#f85149';
+    // Green for success and status
+    else if (/^\[\+\]/.test(line)) color = '#3fb950';
+    else if (/^\[\*\]/.test(line)) color = '#3fb950';
+    // Yellow for warnings
+    else if (/^\[!\]/.test(line)) color = '#d29922';
+    // Grey for skip/already
+    else if (/^\[-\]|already installed|skipped/i.test(line)) color = '#8b949e';
 
     const span = document.createElement('span');
     span.style.color = color;
