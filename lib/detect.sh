@@ -28,7 +28,10 @@ detect_build() {
         echo "make|make"; return 0
     fi
     if [ -f "$dir/pyproject.toml" ] || [ -f "$dir/setup.py" ]; then
-        echo "python|pip install --break-system-packages --user ."; return 0
+        echo "python|/opt/pentest-venv/bin/pip install --quiet ."; return 0
+    fi
+    if [ -f "$dir/requirements.txt" ]; then
+        echo "python-req|/opt/pentest-venv/bin/pip install --quiet -r requirements.txt"; return 0
     fi
     if ls "$dir"/*.csproj >/dev/null 2>&1 || ls "$dir"/*.sln >/dev/null 2>&1; then
         echo "dotnet|dotnet build -c Release"; return 0
@@ -86,7 +89,8 @@ ensure_build_deps() {
             print_status "Installing build-essential..."
             apt_install_quiet build-essential
             ;;
-        python)
+        python|python-req)
+            [ -f "/opt/pentest-venv/bin/pip" ] && return 0
             command -v pip3 >/dev/null && return 0
             print_status "Installing pip3..."
             apt_install_quiet python3-pip

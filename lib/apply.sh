@@ -252,7 +252,7 @@ apply_bundle() {
                 fi
 
                 printf "  ${BLUE}[cargo]${NC} %s ... " "$pkg_name"
-                if cargo install "$pkg_name" --quiet 2>/dev/null; then
+                if cargo install "$pkg_name" --quiet 2>/dev/null || true; then
                     local ver
                     ver=$(cargo install --list 2>/dev/null | grep "^${pkg_name} " | head -1 | sed 's/.* v//;s/:.*//')
                     local json
