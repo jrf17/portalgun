@@ -179,65 +179,48 @@ apply_bundle() {
         _progress 81 "Phase 3: Setting up /opt/pentest-venv..."
         print_status "Phase 3: pip packages ($pip_count) → $VENV"
 
-        # Create venv if it doesn't exist
-        if [ ! -f "$VENV/bin/pip" ]; then
+        # Create venv if needed
+        if [ ! -f "$VENV_PIP" ]; then
             print_status "  Creating venv at $VENV..."
             python3 -m venv "$VENV"
             "$VENV_PIP" install --quiet --upgrade pip setuptools wheel
         fi
 
-        local pip_needed=()
+        # Write requirements.txt and install all at once
+        # pip resolves the full dependency graph together — no batching conflicts
+        local req_file
+        req_file=$(mktemp /tmp/portalgun_req_XXXXXX.txt)
+        jq -r '(.tools.pip // [])[]' "$bundle_file" > "$req_file"
+        local pip_total
+        pip_total=$(wc -l < "$req_file")
+
+        print_status "  Installing $pip_total packages via requirements.txt..."
+        _progress 82 "Phase 3: pip — resolving and installing $pip_total packages..."
+
+        "$VENV_PIP" install --quiet -r "$req_file" 2>&1 | \
+            grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
+            grep -v "dependency resolver does not currently" || true
+
+        rm -f "$req_file"
+
+        # Register all pip packages
         while IFS= read -r pkg_spec; do
             [ -z "$pkg_spec" ] && continue
-            local pkg_name safe_id
+            local pkg_name pkg_ver safe_id
             pkg_name=$(echo "$pkg_spec" | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            pkg_ver=$(echo "$pkg_spec" | cut -d= -f3)
             safe_id=$(echo "$pkg_name" | tr -cs 'a-z0-9._-' '_')
-            registry_exists pip "$safe_id" || pip_needed+=("$pkg_spec")
-        done < <(jq -r '(.tools.pip // [])[]' "$bundle_file")
-
-        local pip_skip=$(( pip_count - ${#pip_needed[@]} ))
-        local pip_total_batches=$(( (${#pip_needed[@]} + 49) / 50 ))
-        print_status "  $pip_skip already installed, ${#pip_needed[@]} to install ($pip_total_batches batches)"
-
-        if [ ${#pip_needed[@]} -gt 0 ]; then
-            local batch=() batch_num=0
-            for pkg_spec in "${pip_needed[@]}"; do
-                batch+=("$pkg_spec")
-                if [ ${#batch[@]} -ge 50 ]; then
-                    (( batch_num++ )) || true
-                    local pct=$(( 81 + ( batch_num * 13 / pip_total_batches ) ))
-                    _progress "$pct" "Phase 3: pip [batch $batch_num/$pip_total_batches]"
-                    printf "  Installing pip batch %d/%d...\n" "$batch_num" "$pip_total_batches"
-                    "$VENV_PIP" install --quiet "${batch[@]}" 2>&1 | grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | grep -v "dependency resolver does not currently" || true
-                    batch=()
-                fi
-            done
-            if [ ${#batch[@]} -gt 0 ]; then
-                (( batch_num++ )) || true
-                local pct=$(( 81 + ( batch_num * 13 / pip_total_batches ) ))
-                _progress "$pct" "Phase 3: pip [batch $batch_num/$pip_total_batches]"
-                printf "  Installing pip batch %d/%d...\n" "$batch_num" "$pip_total_batches"
-                "$VENV_PIP" install --quiet "${batch[@]}" 2>&1 | grep -E "^ERROR|Cannot install|Failed to build" || true
+            if ! registry_exists pip "$safe_id"; then
+                local json
+                json=$(jq -n \
+                    --arg name    "$pkg_name" \
+                    --arg package "$pkg_spec" \
+                    --arg version "$pkg_ver" \
+                    --arg added   "$(date -Iseconds)" \
+                    '{name:$name,type:"pip",package:$package,version:$version,status:"ok",added:$added}')
+                registry_write pip "$safe_id" "$json"
             fi
-
-                while IFS= read -r pkg_spec; do
-                    [ -z "$pkg_spec" ] && continue
-                    local pkg_name pkg_ver safe_id
-                    pkg_name=$(echo "$pkg_spec" | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-                    pkg_ver=$(echo "$pkg_spec" | cut -d= -f3)
-                    safe_id=$(echo "$pkg_name" | tr -cs 'a-z0-9._-' '_')
-                    if ! registry_exists pip "$safe_id"; then
-                        local json
-                        json=$(jq -n \
-                            --arg name    "$pkg_name" \
-                            --arg package "$pkg_spec" \
-                            --arg version "$pkg_ver" \
-                            --arg added   "$(date -Iseconds)" \
-                            '{name:$name,type:"pip",package:$package,version:$version,status:"ok",added:$added}')
-                        registry_write pip "$safe_id" "$json"
-                    fi
-                done < <(jq -r '(.tools.pip // [])[]' "$bundle_file")
-        fi
+        done < <(jq -r '(.tools.pip // [])[]' "$bundle_file")
 
         _progress 95 "Phase 3: pip complete"
         print_status "pip phase complete"
