@@ -98,3 +98,106 @@ Logs:    /var/log/portalgun
 
 [0;32m[PASS][0m ═══ ITERATION 1: ZERO ERRORS — PRODUCTION READY ═══
 [0;32m[PASS][0m Iteration 1/9: CLEAN
+[main db85724] portalgun: clean install run 1/9
+ Author: Claude Sonnet 4.6 <noreply@anthropic.com>
+ 3 files changed, 6357 insertions(+)
+ create mode 100644 tests/logs/iter1_20260531_193215.log
+ create mode 100644 tests/logs/production_20260531_193215.log
+
+[0;34m[TEST 20:01:19][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 20:01:19][0m   ITERATION 2 / 9
+[0;34m[TEST 20:01:19][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 20:01:19][0m Reverting linux2024 → snapshot1 ...
+Domain snapshot snapshot1 reverted
+
+[0;34m[TEST 20:01:37][0m Waiting for SSH (using sshpass until key is installed)...
+[0;34m[TEST 20:01:37][0m SSH up after 0 attempts.
+[0;34m[TEST 20:01:38][0m VM ready.
+[0;34m[TEST 20:01:38][0m Syncing clock to 1780282898...
+[0;34m[TEST 20:01:39][0m Rsyncing portalgun source to VM...
+[0;34m[TEST 20:01:40][0m Installing prerequisites (apt update + jq rsync python3)...
+Processing triggers for kali-menu (2026.1.5)…
+[0;34m[TEST 20:02:05][0m Copying and running vm_deploy.sh on VM...
+[vm_deploy] Setting up web dir...
+[vm_deploy] Installing portalgun...
+[0;34m[*][0m Installing portalgun to /opt/portalgun...
+[0;32m[+][0m Files copied
+[0;32m[+][0m First-boot service enabled (regenerates machine-id + SSH keys on clones)
+[0;32m[+][0m Linked /usr/local/bin/portalgun → /opt/portalgun/bin/portalgun
+[0;32m[+][0m Registry dir: /var/lib/portalgun/registry
+[0;32m[+][0m Log dir:      /var/log/portalgun
+[0;32m[+][0m Bundle → /opt/portalgun/portalgun_bundle.json
+[0;32m[+][0m Pentest venv PATH → /etc/profile.d/pentest-venv.sh
+[0;32m[+][0m Zsh completion → /usr/share/zsh/site-functions/_portalgun
+[0;34m[*][0m   (run 'rm -f ~/.zcompdump*' and start a new shell to load it)
+[0;32m[+][0m Web pages → /opt/tools-docs/portalgun_{tools,wiki}.html
+[0;32m[+][0m Linked tools + wiki from /opt/tools-docs/index.html
+
+═══════════════════════════════════════════════════════════════════
+                [0;32mportalgun installed[0m
+═══════════════════════════════════════════════════════════════════
+
+Try:
+  portalgun help
+  portalgun status
+  sudo portalgun install apt nmap
+  sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/windows/exploit
+
+Web UI: open http://localhost:1337/portalgun_tools.html
+Registry: /var/lib/portalgun/registry
+Logs:    /var/log/portalgun
+
+[vm_deploy] Starting install all (logging to /tmp/pg_install.log)...
+[vm_deploy] Install PID: 72015
+[vm_deploy] Done. Poll /tmp/pg_install.log for progress.
+[0;34m[TEST 20:02:07][0m Deploy + install started.
+[0;34m[TEST 20:02:07][0m Polling VM install log (max 150m)...
+[0;34m[TEST 20:02:07][0m [1m] Phase 1: PROGRESS:2:Phase 1: Downloading apt packages (1023)...
+[0;34m[TEST 20:03:07][0m [2m] Phase 1: PROGRESS:2:Phase 1: Downloading apt packages (1023)...
+[0;34m[TEST 20:04:08][0m [3m] Phase 1:   [apt] [84/1023] libgrpc29t64
+[0;34m[TEST 20:05:08][0m [4m] Phase 1:   [apt] [322/1023] azurehound
+[0;34m[TEST 20:06:08][0m [5m] Phase 1:   [apt] [542/1023] exploitdb-papers
+[0;34m[TEST 20:07:09][0m [6m] Phase 1:   [apt] [642/1023] libgnuradio-qtgui3.10.12
+[0;34m[TEST 20:08:09][0m [7m] Phase 1:   [apt] [1021/1023] node-repeat-string
+[0;34m[TEST 20:09:09][0m [8m] Phase 1:   [apt] [1023/1023] obsidian
+[0;34m[TEST 20:10:10][0m [9m] Phase 1:   [apt] [1023/1023] xrdp
+[0;34m[TEST 20:11:10][0m [10m] Phase 1:   [apt] [1023/1023] python3-azure
+[0;34m[TEST 20:12:10][0m [11m] Phase 1:   [apt] [1023/1023] ghidra
+[0;34m[TEST 20:13:11][0m [12m] Phase 1:   [apt] [1023/1023] ghidra
+[0;34m[TEST 20:14:11][0m [13m] Phase 2:   [git]  cloudfox ... 
+[0;34m[TEST 20:15:12][0m [14m] Phase 2:   [git]  cloudmapper ... 
+[0;34m[TEST 20:16:12][0m [15m] Phase 2:   [git]  precompiled-binaries ... 
+[0;34m[TEST 20:17:12][0m [16m] Phase 2:   [git]  bytecode-viewer ... 
+[0;34m[TEST 20:18:13][0m [17m] Phase 2:   [git]  bytecode-viewer ... 
+[0;34m[TEST 20:19:13][0m [18m] Phase 2:   [git]  bytecode-viewer ... 
+[0;34m[TEST 20:20:13][0m [19m] Phase 2:   [git]  tools4mane ... 
+[0;34m[TEST 20:21:14][0m [20m] Phase 2:   [git]  avml ... 
+[0;34m[TEST 20:22:14][0m [21m] Phase 2:   [git]  avml ... 
+[0;34m[TEST 20:23:14][0m [22m] Phase 2:   [git]  avml ... 
+[0;34m[TEST 20:24:15][0m [23m] Phase 2:   [git]  gcpwn ... 
+[0;34m[TEST 20:25:15][0m [24m] Phase 2:   [git]  kdigger ... 
+[0;34m[TEST 20:26:15][0m [25m] Phase 2:   [git]  routersploit ... 
+[0;34m[TEST 20:27:16][0m [26m] Phase 3: [*]   Creating venv at /opt/pentest-venv...
+[0;34m[TEST 20:28:16][0m [27m] Phase 4:   [cargo] cargo-update ... 
+[0;34m[TEST 20:29:16][0m [28m] Phase 4:   [cargo] cargo-update ... 
+[0;34m[TEST 20:30:17][0m Install complete after 28m.
+[0;34m[TEST 20:30:17][0m === Validating iteration 2 ===
+[0;32m[PASS][0m apt phase completed
+[0;32m[PASS][0m github: 186 installed, 0 failed
+/home/p3ta/dev/portalgun/tests/portalgun_test.sh: line 170: [: 0
+0: integer expected
+[0;32m[PASS][0m pip: no PEP 668 blocks
+[0;32m[PASS][0m pip: no hard errors
+[0;32m[PASS][0m pip phase completed
+[0;32m[PASS][0m jq: clean
+[0;32m[PASS][0m install: reached completion
+  apt tools:     1021
+  github tools:  185 (build_failed: 51)
+  pip packages:  822
+  cargo tools:   1
+  total:         2029
+  installers/install_github_tools.sh: present
+[0;32m[PASS][0m registry: 2029 tools
+
+[0;32m[PASS][0m ═══ ITERATION 2: ZERO ERRORS — PRODUCTION READY ═══
+[0;32m[PASS][0m Iteration 2/9: CLEAN
