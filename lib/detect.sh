@@ -33,8 +33,21 @@ detect_build() {
     if [ -f "$dir/requirements.txt" ]; then
         echo "python-req|/opt/pentest-venv/bin/pip install --quiet -r requirements.txt"; return 0
     fi
-    if ls "$dir"/*.csproj >/dev/null 2>&1 || ls "$dir"/*.sln >/dev/null 2>&1; then
-        echo "dotnet|dotnet build -c Release"; return 0
+    if ls "$dir"/*.sln >/dev/null 2>&1; then
+        echo "dotnet|dotnet build -c Release --nologo 2>&1 | tail -5"; return 0
+    fi
+    if ls "$dir"/*.csproj >/dev/null 2>&1; then
+        echo "dotnet|dotnet build -c Release --nologo 2>&1 | tail -5"; return 0
+    fi
+    # Single .cs file — compile with mcs (Mono C# compiler)
+    local cs_files
+    cs_files=$(ls "$dir"/*.cs 2>/dev/null | wc -l)
+    if [ "$cs_files" -eq 1 ]; then
+        local cs_file
+        cs_file=$(ls "$dir"/*.cs 2>/dev/null | head -1)
+        local out_name
+        out_name=$(basename "$cs_file" .cs)
+        echo "csharp-single|mcs $cs_file -target:exe -out:${out_name}.exe 2>&1 | tail -3"; return 0
     fi
     if [ -f "$dir/package.json" ]; then
         if jq -e '.scripts.build' "$dir/package.json" >/dev/null 2>&1; then
@@ -51,6 +64,10 @@ should_compile() {
     local detected_lang="$2"
 
     [ "$detected_lang" = "none" ] && return 1
+    # Allow C# single-file and dotnet builds on Linux even for windows/ tools
+    [[ "$detected_lang" == "csharp-single" ]] && return 0
+    [[ "$detected_lang" == "dotnet" ]] && return 0
+    # Skip other windows tools (rust/go/cmake etc need Windows toolchain)
     [[ "$target_dir" == */windows/* ]] && return 1
     return 0
 }
@@ -95,10 +112,11 @@ ensure_build_deps() {
             print_status "Installing pip3..."
             apt_install_quiet python3-pip
             ;;
-        dotnet)
+        dotnet|csharp-single)
+            command -v mcs >/dev/null && return 0
             command -v dotnet >/dev/null && return 0
-            print_status "Installing .NET SDK..."
-            apt_install_quiet dotnet-sdk-8.0
+            print_status "Installing Mono C# compiler..."
+            apt_install_quiet mono-mcs mono-devel
             ;;
         node)
             command -v npm >/dev/null && return 0
