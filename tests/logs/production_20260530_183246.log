@@ -510,3 +510,14 @@ Logs:    /var/log/portalgun
 
 [0;32m[PASS][0m ═══ ITERATION 5: ZERO ERRORS — PRODUCTION READY ═══
 [0;32m[PASS][0m Iteration 5/9: CLEAN
+[main c6fdf68] portalgun: clean install run 5/9
+ Author: Claude Sonnet 4.6 <noreply@anthropic.com>
+ 2 files changed, 6347 insertions(+)
+ create mode 100644 tests/logs/iter5_20260530_203201.log
+
+[0;34m[TEST 21:00:00][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 21:00:00][0m   ITERATION 6 / 9
+[0;34m[TEST 21:00:00][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 21:00:00][0m Reverting linux2024 → snapshot1 ...
+Domain snapshot snapshot1 reverted
+
