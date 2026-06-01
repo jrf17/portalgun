@@ -34,10 +34,11 @@ detect_build() {
         echo "python-req|/opt/pentest-venv/bin/pip install --quiet -r requirements.txt"; return 0
     fi
     if ls "$dir"/*.sln >/dev/null 2>&1; then
-        echo "dotnet|dotnet build -c Release --nologo 2>&1 | tail -5"; return 0
+        # Try xbuild (Mono) first — works for .NET Framework targets on Linux
+        echo "dotnet|xbuild \$(ls *.sln | head -1) /p:Configuration=Release /nologo 2>&1 | tail -5"; return 0
     fi
     if ls "$dir"/*.csproj >/dev/null 2>&1; then
-        echo "dotnet|dotnet build -c Release --nologo 2>&1 | tail -5"; return 0
+        echo "dotnet|xbuild \$(ls *.csproj | head -1) /p:Configuration=Release /nologo 2>&1 | tail -5"; return 0
     fi
     # Single .cs file — compile with mcs (Mono C# compiler)
     local cs_files
@@ -113,10 +114,11 @@ ensure_build_deps() {
             apt_install_quiet python3-pip
             ;;
         dotnet|csharp-single)
+            command -v xbuild >/dev/null && return 0
             command -v mcs >/dev/null && return 0
             command -v dotnet >/dev/null && return 0
-            print_status "Installing Mono C# compiler..."
-            apt_install_quiet mono-mcs mono-devel
+            print_status "Installing Mono (C# compiler + xbuild)..."
+            apt_install_quiet mono-complete mono-mcs
             ;;
         node)
             command -v npm >/dev/null && return 0
