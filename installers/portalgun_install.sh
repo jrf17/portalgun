@@ -109,11 +109,13 @@ fi
 DOTFILES_DIR="$WEB_DIR/dotfiles"
 mkdir -p "$DOTFILES_DIR"/{zellij/{custom,p3ta_files/{layouts,plugins,scripts}},tmux/custom}
 
-# Copy dotfiles from repo if they exist
-for f in zshrc zshrc_nerd zshrc_kali_default kitty.conf starship.toml tmux.conf; do
-    src="$SRC_ROOT/configs/$f"
-    [ -f "$src" ] && cp "$src" "$DOTFILES_DIR/$f" 2>/dev/null || true
-done
+# Copy ALL dotfiles from repo configs dir
+if [ -d "$SRC_ROOT/configs" ]; then
+    for f in zshrc zshrc_nerd zshrc_kali_default kitty.conf starship.toml tmux.conf; do
+        src="$SRC_ROOT/configs/$f"
+        [ -f "$src" ] && cp "$src" "$DOTFILES_DIR/$f" && print_status "  copied $f" || true
+    done
+fi
 
 # Create manifest.json if it doesn't exist
 if [ ! -f "$DOTFILES_DIR/manifest.json" ]; then
