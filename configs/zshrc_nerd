@@ -110,7 +110,7 @@ fi
 
 
 DIR=$'%B%F{yellow}%(6~.%-1~/…/%4~.%5~)%b%F{green}'
-NAME=$'%F{magenta}Get_Piped'
+NAME=$'%F{magenta}%n@%m'
 
 if [ "$color_prompt" = yes ]; then
 
