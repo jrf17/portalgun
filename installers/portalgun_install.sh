@@ -109,12 +109,33 @@ fi
 DOTFILES_DIR="$WEB_DIR/dotfiles"
 mkdir -p "$DOTFILES_DIR"/{zellij/{custom,p3ta_files/{layouts,plugins,scripts}},tmux/custom}
 
-# Copy ALL dotfiles from repo configs dir
+# Copy ALL dotfiles from repo
 if [ -d "$SRC_ROOT/configs" ]; then
     for f in zshrc zshrc_nerd zshrc_kali_default kitty.conf starship.toml tmux.conf; do
         src="$SRC_ROOT/configs/$f"
         [ -f "$src" ] && cp "$src" "$DOTFILES_DIR/$f" && print_status "  copied $f" || true
     done
+fi
+
+# Copy tmux themes + hotkeys
+if [ -d "$SRC_ROOT/tmux" ]; then
+    mkdir -p "$DOTFILES_DIR/tmux/custom" "$DOTFILES_DIR/tmux/imported"
+    cp "$SRC_ROOT/tmux/"*.conf "$DOTFILES_DIR/tmux/" 2>/dev/null || true
+    print_status "  copied tmux themes"
+fi
+
+# Copy zellij configs + plugins
+if [ -d "$SRC_ROOT/configs/zellij" ]; then
+    mkdir -p "$DOTFILES_DIR/zellij/p3ta_files/layouts" \
+              "$DOTFILES_DIR/zellij/p3ta_files/plugins" \
+              "$DOTFILES_DIR/zellij/p3ta_files/scripts" \
+              "$DOTFILES_DIR/zellij/custom"
+    [ -f "$SRC_ROOT/configs/zellij/config.kdl" ] && cp "$SRC_ROOT/configs/zellij/config.kdl" "$DOTFILES_DIR/zellij/"
+    [ -f "$SRC_ROOT/configs/zellij/themes.kdl" ] && cp "$SRC_ROOT/configs/zellij/themes.kdl" "$DOTFILES_DIR/zellij/"
+    cp "$SRC_ROOT/configs/zellij/layouts/"* "$DOTFILES_DIR/zellij/p3ta_files/layouts/" 2>/dev/null || true
+    cp "$SRC_ROOT/configs/zellij/plugins/"* "$DOTFILES_DIR/zellij/p3ta_files/plugins/" 2>/dev/null || true
+    cp "$SRC_ROOT/configs/zellij/scripts/"* "$DOTFILES_DIR/zellij/p3ta_files/scripts/" 2>/dev/null || true
+    print_status "  copied zellij configs + zjstatus plugin"
 fi
 
 # Create manifest.json if it doesn't exist

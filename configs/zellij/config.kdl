@@ -1,7 +1,3 @@
-//
-// Zellij Configuration
-//
-
 keybinds clear-defaults=true {
     normal {
         bind "Alt left" { MoveFocusOrTab "left"; }
@@ -226,7 +222,6 @@ keybinds clear-defaults=true {
     }
 }
 
-// Plugin aliases
 plugins {
     about location="zellij:about"
     compact-bar location="zellij:compact-bar"
@@ -247,20 +242,18 @@ plugins {
 load_plugins {
 }
 
+auto_accept_permissions true
+
 ui {
     pane_frames {
         rounded_corners true
     }
 }
 
-web_client {
-    font "monospace"
-}
-
 simplified_ui false
 theme "tokyo-night"
 default_mode "normal"
-default_shell "/usr/bin/zsh"
+default_shell "zsh"
 default_layout "default"
 mouse_mode true
 pane_frames true
@@ -274,13 +267,8 @@ serialize_pane_viewport false
 scrollback_lines_to_serialize 10000
 styled_underlines true
 disable_session_metadata false
-support_kitty_keyboard_protocol false
-web_server false
-web_sharing "off"
-enforce_https_for_localhost false
+support_kitty_keyboard_protocol true
 stacked_resize true
 show_startup_tips false
 show_release_notes true
 advanced_mouse_actions true
-web_server_ip "127.0.0.1"
-web_server_port 8082

@@ -339,24 +339,57 @@ apply_bundle() {
 
         # zsh plugins
         local ZSH_CUSTOM="$home/.oh-my-zsh/custom"
-        if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
+        for plugin_url in \
+            "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
+            "https://github.com/zsh-users/zsh-autosuggestions"; do
+            local plugin_name
+            plugin_name=$(basename "$plugin_url" .git)
+            if [ ! -d "$ZSH_CUSTOM/plugins/$plugin_name" ]; then
+                if [ "$user" = "root" ]; then
+                    git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
+                else
+                    sudo -u "$user" git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
+                fi
+            fi
+        done
+
+        # TPM + tmux plugins
+        mkdir -p "$home/.tmux/plugins"
+        if [ ! -d "$home/.tmux/plugins/tpm" ]; then
             if [ "$user" = "root" ]; then
-                git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+                git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
             else
-                sudo -u "$user" git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+                sudo -u "$user" git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
             fi
         fi
-        if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
-            if [ "$user" = "root" ]; then
-                git clone -q https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
-            else
-                sudo -u "$user" git clone -q https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+        # Pre-install tmux plugins (can't use TPM headlessly — clone directly)
+        for plugin_url in \
+            "https://github.com/tmux-plugins/tmux-sensible" \
+            "https://github.com/tmux-plugins/tmux-resurrect" \
+            "https://github.com/tmux-plugins/tmux-yank"; do
+            local plugin_name
+            plugin_name=$(basename "$plugin_url")
+            if [ ! -d "$home/.tmux/plugins/$plugin_name" ]; then
+                if [ "$user" = "root" ]; then
+                    git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
+                else
+                    sudo -u "$user" git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
+                fi
             fi
-        fi
+        done
+
+        # zellij config
+        mkdir -p "$home/.config/zellij/layouts" "$home/.config/zellij/plugins"
+        local ZELLIJ_CONFIGS="$CONFIGS_DIR/zellij"
+        [ -f "$ZELLIJ_CONFIGS/config.kdl" ] && cp "$ZELLIJ_CONFIGS/config.kdl" "$home/.config/zellij/config.kdl"
+        [ -f "$ZELLIJ_CONFIGS/themes.kdl" ] && cp "$ZELLIJ_CONFIGS/themes.kdl" "$home/.config/zellij/themes.kdl"
+        [ -f "$ZELLIJ_CONFIGS/layouts/default.kdl" ] && cp "$ZELLIJ_CONFIGS/layouts/default.kdl" "$home/.config/zellij/layouts/default.kdl"
+        [ -f "$ZELLIJ_CONFIGS/plugins/zjstatus.wasm" ] && cp "$ZELLIJ_CONFIGS/plugins/zjstatus.wasm" "$home/.config/zellij/plugins/zjstatus.wasm"
+        chown -R "$user:$user" "$home/.config/zellij" 2>/dev/null || true
 
         # Set zsh as default shell
         chsh -s /usr/bin/zsh "$user" 2>/dev/null || true
-        print_success "    $user: dotfiles applied, zsh set as default"
+        print_success "    $user: shell + tmux + zellij configured"
     }
 
     if [ -d "$CONFIGS_DIR" ]; then
