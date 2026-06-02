@@ -105,6 +105,54 @@ else
     print_warning "$ZSH_COMP_DIR not found; skipping zsh completion"
 fi
 
+# ─── Dotfiles directory + manifest ──────────────────────────────────
+DOTFILES_DIR="$WEB_DIR/dotfiles"
+mkdir -p "$DOTFILES_DIR"/{zellij/{custom,p3ta_files/{layouts,plugins,scripts}},tmux/custom}
+
+# Copy dotfiles from repo if they exist
+for f in zshrc zshrc_nerd zshrc_kali_default kitty.conf starship.toml tmux.conf; do
+    src="$SRC_ROOT/configs/$f"
+    [ -f "$src" ] && cp "$src" "$DOTFILES_DIR/$f" 2>/dev/null || true
+done
+
+# Create manifest.json if it doesn't exist
+if [ ! -f "$DOTFILES_DIR/manifest.json" ]; then
+    cat > "$DOTFILES_DIR/manifest.json" << 'MANIFEST'
+{
+  "dotfiles": [
+    {
+      "id": "zshrc_kali_default",
+      "name": "Kali Default",
+      "file": "zshrc_kali_default",
+      "target": "~/.zshrc",
+      "description": "Stock Kali Linux zshrc - unmodified default",
+      "category": "shell",
+      "requires": ["zsh"]
+    },
+    {
+      "id": "zshrc_p3ta",
+      "name": "p3ta",
+      "file": "zshrc",
+      "target": "~/.zshrc",
+      "description": "Oh-My-Zsh with Starship, FZF, Zoxide, modern aliases",
+      "category": "shell",
+      "requires": ["zsh", "starship", "fzf", "zoxide", "eza", "bat"]
+    },
+    {
+      "id": "zshrc_jp",
+      "name": "JP",
+      "file": "zshrc_nerd",
+      "target": "~/.zshrc",
+      "description": "Kali-style zshrc with NerdFonts glyphs, completion, history",
+      "category": "shell",
+      "requires": ["zsh", "nerdfonts"]
+    }
+  ]
+}
+MANIFEST
+    print_success "Dotfiles manifest created"
+fi
+
 # ─── Web UI integration ─────────────────────────────────────────────
 if [ -d "$WEB_DIR" ]; then
     cp "$INSTALL_ROOT/web/portalgun_tools.html" "$WEB_DIR/portalgun_tools.html"
