@@ -197,9 +197,15 @@ apply_bundle() {
         print_status "  Installing $pip_total packages via requirements.txt..."
         _progress 82 "Phase 3: pip — resolving and installing $pip_total packages..."
 
-        "$VENV_PIP" install --quiet -r "$req_file" 2>&1 | \
-            grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
-            grep -v "dependency resolver does not currently" || true
+        local pip_fail_log="$PORTALGUN_LOG_DIR/pip_failures.log"
+        local pip_output
+        pip_output=$("$VENV_PIP" install --quiet -r "$req_file" 2>&1)
+        # Show and log real errors
+        echo "$pip_output" | grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
+            grep -v "dependency resolver does not currently" | tee -a "$pip_fail_log" || true
+        local fail_count
+        fail_count=$(echo "$pip_output" | grep -c "^ERROR:\|× Failed" || echo 0)
+        [ "$fail_count" -gt 0 ] && print_warning "$fail_count pip packages failed — see $pip_fail_log" || true
 
         rm -f "$req_file"
 
@@ -277,9 +283,17 @@ apply_bundle() {
         echo ""
     fi
 
+    # Auto-register all installed tools so web UI search is populated
+    _progress 99 "Registering tools in registry..."
+    print_status "Running portalgun register to populate search..."
+    source "$PORTALGUN_LIB/register.sh"
+    register_all 2>/dev/null | grep -E "registered|summary" || true
+
     source "$PORTALGUN_LIB/sync_web.sh"
     sync_web_manifest
 
     _progress 100 "Installation complete!"
     print_success "Done. Run 'portalgun status' to verify."
+    # Emit refresh signal so web UI reloads tool list
+    echo "REFRESH_MANIFEST"
 }

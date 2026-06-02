@@ -79,6 +79,20 @@ update_all() {
             new_commit=$(git -C "$src_dir" rev-parse HEAD 2>/dev/null | cut -c1-7)
             printf "${GREEN}%s → %s${NC}" "$old_commit" "$new_commit"
 
+            # Re-detect build system in case it wasn't compiled before
+            if [ -z "$build_cmd" ]; then
+                source "$PORTALGUN_LIB/detect.sh"
+                local detect_result
+                detect_result=$(detect_build "$src_dir")
+                local detected_lang="${detect_result%%|*}"
+                build_cmd="${detect_result#*|}"
+                local tool_dir_up
+                tool_dir_up=$(dirname "$src_dir")
+                if ! should_compile "$tool_dir_up" "$detected_lang"; then
+                    build_cmd=""
+                fi
+            fi
+
             if [ -n "$build_cmd" ]; then
                 printf " | building..."
                 if (cd "$src_dir" && eval "$build_cmd" >/dev/null 2>&1); then

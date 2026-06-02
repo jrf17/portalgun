@@ -1162,6 +1162,22 @@ def admin_install():
     )
 
 
+@app.route('/api/admin/job/<job_id>/stop', methods=['POST'])
+def job_stop(job_id):
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({'error': 'job not found'}), 404
+    proc = job.get('proc')
+    if proc and proc.poll() is None:
+        proc.terminate()
+        import time; time.sleep(1)
+        if proc.poll() is None:
+            proc.kill()
+    job['done'] = True
+    job['rc'] = -1
+    return jsonify({'stopped': True})
+
+
 @app.route('/api/admin/job/<job_id>/stream')
 def job_stream(job_id):
     job = JOBS.get(job_id)
@@ -1182,6 +1198,9 @@ def job_stream(job_id):
                         for line in chunk.splitlines():
                             clean = ANSI_ESCAPE.sub('', line).rstrip()
                             if not clean:
+                                continue
+                            if clean == 'REFRESH_MANIFEST':
+                                yield json.dumps({'refresh': True}) + '\n'
                                 continue
                             if clean.startswith('PROGRESS:'):
                                 parts = clean.split(':', 2)

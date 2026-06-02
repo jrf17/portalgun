@@ -80,6 +80,15 @@ fi
 PROFILE
 chmod 644 /etc/profile.d/pentest-venv.sh
 
+# Also add to /etc/bash.bashrc for non-login interactive shells
+if ! grep -q "pentest-venv" /etc/bash.bashrc 2>/dev/null; then
+    echo 'source /etc/profile.d/pentest-venv.sh 2>/dev/null' >> /etc/bash.bashrc
+fi
+# And /etc/zsh/zshenv for zsh users
+if ! grep -q "pentest-venv" /etc/zsh/zshenv 2>/dev/null; then
+    echo 'source /etc/profile.d/pentest-venv.sh 2>/dev/null' >> /etc/zsh/zshenv 2>/dev/null || true
+fi
+
 # Allow sudo to find venv binaries
 if ! grep -q "pentest-venv" /etc/sudoers 2>/dev/null; then
     echo 'Defaults secure_path="/opt/pentest-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' \

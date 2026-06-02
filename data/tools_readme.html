@@ -1972,7 +1972,17 @@ function setProgress(pct, label, show) {
     if (show === false) { wrap.style.display = 'none'; return; }
     wrap.style.display = 'block';
     bar.style.width = pct + '%';
-    pctEl.textContent = pct + '%';
+
+    // Calculate ETA
+    let etaStr = '';
+    if (pct > 2 && pct < 100 && window._installStart) {
+        const elapsed = (Date.now() - window._installStart) / 1000;
+        const total = elapsed / (pct / 100);
+        const remaining = Math.round(total - elapsed);
+        if (remaining > 60) etaStr = ` (~${Math.round(remaining/60)}m remaining)`;
+        else if (remaining > 0) etaStr = ` (~${remaining}s remaining)`;
+    }
+    pctEl.textContent = pct + '%' + etaStr;
     if (label) lblEl.textContent = label;
     // Color shift: blue→purple→green as progress advances
     const colors = pct < 35 ? '#89b4fa,#74c7ec'
@@ -1994,6 +2004,22 @@ function setInstallBusy(type, busy) {
         btn.textContent = busy ? 'Installing...' : 'Install';
     }
     btn.style.opacity = busy ? '0.6' : '1';
+}
+
+let _currentJobId = null;
+
+async function stopInstall() {
+    if (!_currentJobId) return;
+    try {
+        await fetch(`/api/admin/job/${_currentJobId}/stop`, { method: 'POST' });
+        adminOutputLine('[!] Install stopped by user.');
+        setProgress(0, '', false);
+        setInstallBusy('all', false);
+        setInstallBusy('update', false);
+        document.getElementById('stop-install-btn').style.display = 'none';
+    } catch(e) {
+        adminOutputLine(`[!] Stop failed: ${e.message}`);
+    }
 }
 
 async function runInstall(type) {
@@ -2031,7 +2057,11 @@ async function runInstall(type) {
     setInstallBusy(type, true);
     const label = type === 'all' ? 'portalgun install all' : type === 'update' ? 'portalgun update' : (payload.package || payload.url);
     adminOutputLine(`[*] Starting ${type} install: ${label}`);
-    if (type === 'all' || type === 'update') setProgress(0, 'Initializing...', true);
+    if (type === 'all' || type === 'update') {
+        setProgress(0, 'Initializing...', true);
+        document.getElementById('stop-install-btn').style.display = 'inline-block';
+        window._installStart = Date.now();
+    }
 
     try {
         const resp = await fetch('/api/admin/install', {
@@ -2050,7 +2080,10 @@ async function runInstall(type) {
 
         // Long-running job: use background job stream with auto-reconnect
         if (data && data.job_id) {
+            _currentJobId = data.job_id;
             await streamJob(data.job_id, type);
+            _currentJobId = null;
+            document.getElementById('stop-install-btn').style.display = 'none';
             return;
         }
 
@@ -2138,6 +2171,7 @@ async function streamResponse(resp, type) {
                 try {
                     const msg = JSON.parse(ln);
                     if (msg.heartbeat) continue;
+                    if (msg.refresh) { loadInstalledTools(); continue; }
                     if (msg.progress !== undefined) {
                         setProgress(msg.progress, msg.label, true);
                     } else if (msg.line !== undefined) {
