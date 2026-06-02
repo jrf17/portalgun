@@ -2618,8 +2618,7 @@
       "zstandard==0.25.0"
     ],
     "cargo": [
-      "cargo-update",
-      "zellij"
+      "cargo-update"
     ]
   }
 }

@@ -392,6 +392,16 @@ apply_bundle() {
         print_success "    $user: shell + tmux + zellij configured"
     }
 
+    # Install zellij binary (too large to compile via cargo on a VM)
+    if ! command -v zellij >/dev/null 2>&1; then
+        _progress 97 "Phase 5: Installing zellij binary..."
+        print_status "  Downloading zellij binary..."
+        local ZELLIJ_VER
+        ZELLIJ_VER=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | grep tag_name | cut -d'"' -f4 2>/dev/null || echo "v0.44.3")
+        curl -sL "https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VER}/zellij-x86_64-unknown-linux-musl.tar.gz" | \
+            tar xz -C /usr/local/bin/ 2>/dev/null && print_success "  zellij $ZELLIJ_VER installed" || print_warning "  zellij download failed"
+    fi
+
     if [ -d "$CONFIGS_DIR" ]; then
         for user in "${USERS_TO_CONFIGURE[@]}"; do
             _apply_dotfiles_for_user "$user"
