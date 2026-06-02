@@ -1,0 +1,338 @@
+[0;34m[TEST 18:16:04][0m portalgun production validation — up to 9 iterations
+[0;34m[TEST 18:16:04][0m VM: kali@192.168.122.23 via p3ta@192.168.1.49
+
+[0;34m[TEST 18:16:04][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 18:16:04][0m   ITERATION 1 / 9
+[0;34m[TEST 18:16:04][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 18:16:04][0m Reverting linux2024 → snapshot1 ...
+Domain snapshot snapshot1 reverted
+
+[0;34m[TEST 18:16:22][0m Waiting for SSH (using sshpass until key is installed)...
+[0;34m[TEST 18:16:23][0m SSH up after 0 attempts.
+[0;34m[TEST 18:16:24][0m VM ready.
+[0;34m[TEST 18:16:24][0m Syncing clock to 1780362984...
+[0;34m[TEST 18:16:24][0m Rsyncing portalgun source to VM...
+[0;34m[TEST 18:16:25][0m Installing prerequisites (apt update + jq rsync python3)...
+Processing triggers for kali-menu (2026.1.5)…
+[0;34m[TEST 18:16:49][0m Copying and running vm_deploy.sh on VM...
+[vm_deploy] Setting up web dir...
+[vm_deploy] Installing portalgun...
+[0;34m[*][0m Installing portalgun to /opt/portalgun...
+[0;32m[+][0m Files copied
+[0;32m[+][0m First-boot service enabled (regenerates machine-id + SSH keys on clones)
+[0;32m[+][0m Linked /usr/local/bin/portalgun → /opt/portalgun/bin/portalgun
+[0;32m[+][0m Registry dir: /var/lib/portalgun/registry
+[0;32m[+][0m Log dir:      /var/log/portalgun
+[0;32m[+][0m Bundle → /opt/portalgun/portalgun_bundle.json
+[0;32m[+][0m Pentest venv PATH → /etc/profile.d/pentest-venv.sh
+[0;32m[+][0m Zsh completion → /usr/share/zsh/site-functions/_portalgun
+[0;34m[*][0m   (run 'rm -f ~/.zcompdump*' and start a new shell to load it)
+[0;32m[+][0m Web pages → /opt/tools-docs/portalgun_{tools,wiki}.html
+[0;32m[+][0m Linked tools + wiki from /opt/tools-docs/index.html
+
+═══════════════════════════════════════════════════════════════════
+                [0;32mportalgun installed[0m
+═══════════════════════════════════════════════════════════════════
+
+Try:
+  portalgun help
+  portalgun status
+  sudo portalgun install apt nmap
+  sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/windows/exploit
+
+Web UI: open http://localhost:1337/portalgun_tools.html
+Registry: /var/lib/portalgun/registry
+Logs:    /var/log/portalgun
+
+[vm_deploy] Starting install all (logging to /tmp/pg_install.log)...
+[vm_deploy] Install PID: 71999
+[vm_deploy] Done. Poll /tmp/pg_install.log for progress.
+[0;34m[TEST 18:16:51][0m Deploy + install started.
+[0;34m[TEST 18:16:51][0m Polling VM install log (max 150m)...
+[0;34m[TEST 18:16:51][0m [1m] Phase 1: PROGRESS:2:Phase 1: Downloading apt packages (1023)...
+[0;34m[TEST 18:17:51][0m [2m] Phase 1: PROGRESS:2:Phase 1: Downloading apt packages (1023)...
+[0;34m[TEST 18:18:52][0m [3m]  
+[0;34m[TEST 18:19:52][0m [4m]  
+[0;34m[TEST 18:20:52][0m [5m]  
+[0;34m[TEST 18:21:53][0m [6m]  
+[0;34m[TEST 18:22:53][0m [7m]  
+[0;34m[TEST 18:23:53][0m [8m]  
+[0;34m[TEST 18:24:54][0m [9m]  
+[0;34m[TEST 18:25:54][0m [10m]  
+[0;34m[TEST 18:26:55][0m [11m]  
+[0;34m[TEST 18:27:55][0m [12m]  
+[0;34m[TEST 18:28:56][0m [13m]  
+[0;34m[TEST 18:29:56][0m [14m]  
+[0;34m[TEST 18:30:56][0m [15m]  
+[0;34m[TEST 18:31:57][0m [16m]  
+[0;34m[TEST 18:32:57][0m [17m]  
+[0;34m[TEST 18:33:57][0m [18m]  
+[0;34m[TEST 18:34:58][0m [19m]  
+[0;34m[TEST 18:35:58][0m [20m]  
+[0;34m[TEST 18:36:58][0m [21m]  
+[0;34m[TEST 18:37:59][0m [22m]  
+[0;34m[TEST 18:38:59][0m [23m]  
+[0;34m[TEST 18:39:59][0m [24m]  
+[0;34m[TEST 18:41:00][0m [25m]  
+[0;34m[TEST 18:42:00][0m [26m]  
+[0;34m[TEST 18:43:01][0m [27m]  
+[0;34m[TEST 18:44:01][0m [28m]  
+[0;34m[TEST 18:45:01][0m [29m]  
+[0;34m[TEST 18:46:02][0m [30m]  
+[0;34m[TEST 18:47:02][0m [31m]  
+[0;34m[TEST 18:48:03][0m [32m]  
+[0;34m[TEST 18:49:03][0m [33m]  
+[0;34m[TEST 18:50:03][0m [34m]  
+[0;34m[TEST 18:51:04][0m [35m]  
+[0;34m[TEST 18:52:04][0m [36m]  
+[0;34m[TEST 18:53:04][0m [37m]  
+[0;34m[TEST 18:54:05][0m [38m]  
+[0;34m[TEST 18:55:05][0m [39m]  
+[0;34m[TEST 18:56:05][0m [40m]  
+[0;34m[TEST 18:57:05][0m [41m]  
+[0;34m[TEST 18:58:06][0m [42m]  
+[0;34m[TEST 18:59:06][0m [43m]  
+[0;34m[TEST 19:00:06][0m [44m]  
+[0;34m[TEST 19:01:07][0m [45m]  
+[0;34m[TEST 19:02:07][0m [46m]  
+[0;34m[TEST 19:03:07][0m [47m]  
+[0;34m[TEST 19:04:08][0m [48m]  
+[0;34m[TEST 19:05:08][0m [49m]  
+[0;34m[TEST 19:06:08][0m [50m]  
+[0;34m[TEST 19:07:09][0m [51m]  
+[0;34m[TEST 19:08:09][0m [52m]  
+[0;34m[TEST 19:09:09][0m [53m]  
+[0;34m[TEST 19:10:10][0m [54m]  
+[0;34m[TEST 19:11:10][0m [55m]  
+[0;34m[TEST 19:12:10][0m [56m]  
+[0;34m[TEST 19:13:11][0m [57m]  
+[0;34m[TEST 19:14:11][0m [58m]  
+[0;34m[TEST 19:15:11][0m [59m]  
+[0;34m[TEST 19:16:12][0m [60m]  
+[0;34m[TEST 19:17:12][0m [61m]  
+[0;34m[TEST 19:18:12][0m [62m]  
+[0;34m[TEST 19:19:13][0m [63m]  
+[0;34m[TEST 19:20:13][0m [64m]  
+[0;34m[TEST 19:21:13][0m [65m]  
+[0;34m[TEST 19:22:14][0m [66m]  
+[0;34m[TEST 19:23:14][0m [67m]  
+[0;34m[TEST 19:24:14][0m [68m]  
+[0;34m[TEST 19:25:15][0m [69m]  
+[0;34m[TEST 19:26:15][0m [70m]  
+[0;34m[TEST 19:27:15][0m [71m]  
+[0;34m[TEST 19:28:16][0m [72m]  
+[0;34m[TEST 19:29:16][0m [73m]  
+[0;34m[TEST 19:30:16][0m [74m]  
+[0;34m[TEST 19:31:17][0m [75m]  
+[0;34m[TEST 19:32:17][0m [76m]  
+[0;34m[TEST 19:33:17][0m [77m]  
+[0;34m[TEST 19:34:18][0m [78m]  
+[0;34m[TEST 19:35:18][0m [79m]  
+[0;34m[TEST 19:36:18][0m [80m]  
+[0;34m[TEST 19:37:19][0m [81m]  
+[0;34m[TEST 19:38:19][0m [82m]  
+[0;34m[TEST 19:39:19][0m [83m]  
+[0;34m[TEST 19:40:19][0m [84m]  
+[0;34m[TEST 19:41:20][0m [85m]  
+[0;34m[TEST 19:42:20][0m [86m]  
+[0;34m[TEST 19:43:20][0m [87m]  
+[0;34m[TEST 19:44:21][0m [88m]  
+[0;34m[TEST 19:45:21][0m [89m]  
+[0;34m[TEST 19:46:21][0m [90m]  
+[0;34m[TEST 19:47:22][0m [91m]  
+[0;34m[TEST 19:48:22][0m [92m]  
+[0;34m[TEST 19:49:22][0m [93m]  
+[0;34m[TEST 19:50:23][0m [94m]  
+[0;34m[TEST 19:51:23][0m [95m]  
+[0;34m[TEST 19:52:23][0m [96m]  
+[0;34m[TEST 19:53:24][0m [97m]  
+[0;34m[TEST 19:54:24][0m [98m]  
+[0;34m[TEST 19:55:24][0m [99m]  
+[0;34m[TEST 19:56:25][0m [100m]  
+[0;34m[TEST 19:57:25][0m [101m]  
+[0;34m[TEST 19:58:25][0m [102m]  
+[0;34m[TEST 19:59:26][0m [103m]  
+[0;34m[TEST 20:00:26][0m [104m]  
+[0;34m[TEST 20:01:26][0m [105m]  
+[0;34m[TEST 20:02:27][0m [106m]  
+[0;34m[TEST 20:03:27][0m [107m]  
+[0;34m[TEST 20:04:27][0m [108m]  
+[0;34m[TEST 20:05:28][0m [109m]  
+[0;34m[TEST 20:06:28][0m [110m]  
+[0;34m[TEST 20:07:28][0m [111m]  
+[0;34m[TEST 20:08:29][0m [112m]  
+[0;34m[TEST 20:09:30][0m [113m]  
+[0;34m[TEST 20:10:31][0m [114m]  
+[0;34m[TEST 20:11:33][0m [115m]  
+[0;34m[TEST 20:12:35][0m [116m]  
+[0;34m[TEST 20:13:37][0m [117m]  
+[0;34m[TEST 20:14:40][0m [118m]  
+[0;34m[TEST 20:15:44][0m [119m]  
+[0;34m[TEST 20:16:46][0m [120m]  
+[0;34m[TEST 20:17:50][0m [121m]  
+[0;34m[TEST 20:18:52][0m [122m]  
+[0;34m[TEST 20:19:54][0m [123m]  
+[0;34m[TEST 20:20:56][0m [124m]  
+[0;34m[TEST 20:22:00][0m [125m]  
+[0;34m[TEST 20:23:03][0m [126m]  
+[0;34m[TEST 20:24:25][0m [127m]  
+[0;34m[TEST 20:25:25][0m [128m]  
+[0;34m[TEST 20:26:25][0m [129m]  
+[0;34m[TEST 20:27:26][0m [130m]  
+[0;34m[TEST 20:28:26][0m [131m]  
+[0;34m[TEST 20:29:26][0m [132m]  
+[0;34m[TEST 20:30:26][0m [133m]  
+[0;34m[TEST 20:31:27][0m [134m]  
+[0;34m[TEST 20:32:27][0m [135m]  
+[0;34m[TEST 20:33:27][0m [136m]  
+[0;34m[TEST 20:34:28][0m [137m]  
+[0;34m[TEST 20:35:28][0m [138m]  
+[0;34m[TEST 20:36:28][0m [139m]  
+[0;34m[TEST 20:37:29][0m [140m]  
+[0;34m[TEST 20:38:29][0m [141m]  
+[0;34m[TEST 20:39:29][0m [142m]  
+[0;34m[TEST 20:40:30][0m [143m]  
+[0;34m[TEST 20:41:30][0m [144m]  
+[0;34m[TEST 20:42:30][0m [145m]  
+[0;34m[TEST 20:43:31][0m [146m]  
+[0;34m[TEST 20:44:31][0m [147m]  
+[0;34m[TEST 20:45:31][0m [148m]  
+[0;34m[TEST 20:46:31][0m [149m]  
+[0;31m[FAIL][0m Timed out after 150m
+[0;34m[TEST 20:47:32][0m === Validating iteration 1 ===
+[0;31m[FAIL][0m apt phase did not complete
+[0;32m[PASS][0m github: 0 installed, 0 failed
+/home/p3ta/dev/portalgun/tests/portalgun_test.sh: line 170: [: 0
+0: integer expected
+[0;32m[PASS][0m pip: no PEP 668 blocks
+[0;32m[PASS][0m pip: no hard errors
+[0;31m[FAIL][0m pip phase did not complete
+[0;32m[PASS][0m jq: clean
+[0;31m[FAIL][0m install: never reached completion
+  apt tools:     1021
+  github tools:  231 (build_failed: 30)
+  pip packages:  919
+  cargo tools:   1
+  total:         2172
+  installers/install_github_tools.sh: present
+[0;32m[PASS][0m registry: 2172 tools
+
+[0;31m[FAIL][0m ═══ ITERATION 1: 3 errors ═══
+[0;34m[TEST 20:47:32][0m Last 30 lines of install log:
+
+[0;34m[TEST 20:47:32][0m Iteration 1 failed — auto-fixes applied, continuing...
+
+[0;34m[TEST 20:47:32][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 20:47:32][0m   ITERATION 2 / 9
+[0;34m[TEST 20:47:32][0m ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;34m[TEST 20:47:32][0m Reverting linux2024 → snapshot1 ...
+Domain snapshot snapshot1 reverted
+
+[0;34m[TEST 20:47:53][0m Waiting for SSH (using sshpass until key is installed)...
+[0;34m[TEST 20:47:53][0m SSH up after 0 attempts.
+[0;34m[TEST 20:47:54][0m VM ready.
+[0;34m[TEST 20:47:54][0m Syncing clock to 1780372074...
+[0;34m[TEST 20:47:55][0m Rsyncing portalgun source to VM...
+[0;34m[TEST 20:47:56][0m Installing prerequisites (apt update + jq rsync python3)...
+Processing triggers for kali-menu (2026.1.5)…
+[0;34m[TEST 20:48:20][0m Copying and running vm_deploy.sh on VM...
+[vm_deploy] Setting up web dir...
+[vm_deploy] Installing portalgun...
+[0;34m[*][0m Installing portalgun to /opt/portalgun...
+[0;32m[+][0m Files copied
+[0;32m[+][0m First-boot service enabled (regenerates machine-id + SSH keys on clones)
+[0;32m[+][0m Linked /usr/local/bin/portalgun → /opt/portalgun/bin/portalgun
+[0;32m[+][0m Registry dir: /var/lib/portalgun/registry
+[0;32m[+][0m Log dir:      /var/log/portalgun
+[0;32m[+][0m Bundle → /opt/portalgun/portalgun_bundle.json
+[0;32m[+][0m Pentest venv PATH → /etc/profile.d/pentest-venv.sh
+[0;32m[+][0m Zsh completion → /usr/share/zsh/site-functions/_portalgun
+[0;34m[*][0m   (run 'rm -f ~/.zcompdump*' and start a new shell to load it)
+[0;34m[*][0m   copied zshrc
+[0;34m[*][0m   copied zshrc_nerd
+[0;34m[*][0m   copied zshrc_kali_default
+[0;34m[*][0m   copied kitty.conf
+[0;34m[*][0m   copied starship.toml
+[0;34m[*][0m   copied tmux.conf
+[0;34m[*][0m   copied tmux themes
+[0;34m[*][0m   copied zellij configs + zjstatus plugin
+[0;32m[+][0m Dotfiles manifest created
+[0;32m[+][0m Web pages → /opt/tools-docs/portalgun_{tools,wiki}.html
+[0;32m[+][0m Linked tools + wiki from /opt/tools-docs/index.html
+
+═══════════════════════════════════════════════════════════════════
+                [0;32mportalgun installed[0m
+═══════════════════════════════════════════════════════════════════
+
+Try:
+  portalgun help
+  portalgun status
+  sudo portalgun install apt nmap
+  sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/windows/exploit
+
+Web UI: open http://localhost:1337/portalgun_tools.html
+Registry: /var/lib/portalgun/registry
+Logs:    /var/log/portalgun
+
+[vm_deploy] Starting install all (logging to /tmp/pg_install.log)...
+[vm_deploy] Install PID: 72024
+[vm_deploy] Done. Poll /tmp/pg_install.log for progress.
+[0;34m[TEST 20:48:22][0m Deploy + install started.
+[0;34m[TEST 20:48:22][0m Polling VM install log (max 150m)...
+[0;34m[TEST 20:48:22][0m [1m] Phase 1: PROGRESS:2:Phase 1: Downloading apt packages (1039)...
+[0;34m[TEST 20:49:22][0m [2m] Phase 1: PROGRESS:2:Phase 1: Downloading apt packages (1039)...
+[0;34m[TEST 20:50:23][0m [3m] Phase 1:   [apt] [138/1039] libqt6qmlmodels6
+[0;34m[TEST 20:51:23][0m [4m] Phase 1:   [apt] [356/1039] libllvm19
+[0;34m[TEST 20:52:23][0m [5m] Phase 1:   [apt] [547/1039] exploitdb-papers
+[0;34m[TEST 20:53:24][0m [6m] Phase 1:   [apt] [746/1039] gyp
+[0;34m[TEST 20:54:24][0m [7m] Phase 1:   [apt] [1039/1039] libsort-naturally-perl
+[0;34m[TEST 20:55:24][0m [8m] Phase 1:   [apt] [1039/1039] sliver
+[0;34m[TEST 20:56:25][0m [9m] Phase 1:   [apt] [1039/1039] obsidian
+[0;34m[TEST 20:57:25][0m [10m] Phase 1:   [apt] [1039/1039] node-mime-types
+[0;34m[TEST 20:58:25][0m [11m] Phase 1:   [apt] [1039/1039] ghidra
+[0;34m[TEST 20:59:26][0m [12m] Phase 2:   [git]  sliver-cheatsheet ... 
+[0;34m[TEST 21:00:26][0m [13m] Phase 2:   [git]  kubeletctl ... 
+[0;34m[TEST 21:01:26][0m [14m] Phase 2:   [git]  hakrawler ... 
+[0;34m[TEST 21:02:27][0m [15m] Phase 2:   [git]  bytecode-viewer ... 
+[0;34m[TEST 21:03:27][0m [16m] Phase 2:   [git]  bytecode-viewer ... 
+[0;34m[TEST 21:04:28][0m [17m] Phase 2:   [git]  bytecode-viewer ... 
+[0;34m[TEST 21:05:28][0m [18m] Phase 2:   [git]  traitor ... 
+[0;34m[TEST 21:06:28][0m [19m] Phase 2:   [git]  avml ... 
+[0;34m[TEST 21:07:29][0m [20m] Phase 2:   [git]  avml ... 
+[0;34m[TEST 21:08:29][0m [21m] Phase 2:   [git]  avml ... 
+[0;34m[TEST 21:09:29][0m [22m] Phase 2:   [git]  rusthound ... 
+[0;34m[TEST 21:10:30][0m [23m] Phase 2:   [git]  azure-red-team ... 
+[0;34m[TEST 21:11:30][0m [24m] Phase 2:   [git]  routersploit ... 
+[0;34m[TEST 21:12:30][0m [25m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:13:31][0m [26m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:14:31][0m [27m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:15:31][0m [28m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:16:32][0m [29m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:17:32][0m [30m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:18:32][0m [31m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:20:09][0m [32m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:21:10][0m [33m] Phase 2:   [git]  zellij ... 
+[0;34m[TEST 21:22:10][0m [34m] Phase 3: 0: integer expected
+[0;34m[TEST 21:23:10][0m [35m] Phase 4:   [cargo] cargo-update ... 
+[0;34m[TEST 21:24:11][0m [36m] Phase 4:   [cargo] cargo-update ... 
+[0;34m[TEST 21:25:11][0m Install complete after 36m.
+[0;34m[TEST 21:25:11][0m === Validating iteration 2 ===
+[0;32m[PASS][0m apt phase completed
+[0;32m[PASS][0m github: 187 installed, 0 failed
+/home/p3ta/dev/portalgun/tests/portalgun_test.sh: line 170: [: 0
+0: integer expected
+[0;32m[PASS][0m pip: no PEP 668 blocks
+[0;32m[PASS][0m pip: no hard errors
+[0;32m[PASS][0m pip phase completed
+[0;32m[PASS][0m jq: clean
+[0;32m[PASS][0m install: reached completion
+  apt tools:     1037
+  github tools:  233 (build_failed: 52)
+  pip packages:  822
+  cargo tools:   1
+  total:         2093
+  installers/install_github_tools.sh: present
+[0;32m[PASS][0m registry: 2093 tools
+
+[0;32m[PASS][0m ═══ ITERATION 2: ZERO ERRORS — PRODUCTION READY ═══
+[0;32m[PASS][0m Iteration 2/9: CLEAN
