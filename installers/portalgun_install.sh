@@ -117,39 +117,24 @@ done
 
 # Create manifest.json if it doesn't exist
 if [ ! -f "$DOTFILES_DIR/manifest.json" ]; then
-    cat > "$DOTFILES_DIR/manifest.json" << 'MANIFEST'
-{
-  "dotfiles": [
-    {
-      "id": "zshrc_kali_default",
-      "name": "Kali Default",
-      "file": "zshrc_kali_default",
-      "target": "~/.zshrc",
-      "description": "Stock Kali Linux zshrc - unmodified default",
-      "category": "shell",
-      "requires": ["zsh"]
-    },
-    {
-      "id": "zshrc_p3ta",
-      "name": "p3ta",
-      "file": "zshrc",
-      "target": "~/.zshrc",
-      "description": "Oh-My-Zsh with Starship, FZF, Zoxide, modern aliases",
-      "category": "shell",
-      "requires": ["zsh", "starship", "fzf", "zoxide", "eza", "bat"]
-    },
-    {
-      "id": "zshrc_jp",
-      "name": "JP",
-      "file": "zshrc_nerd",
-      "target": "~/.zshrc",
-      "description": "Kali-style zshrc with NerdFonts glyphs, completion, history",
-      "category": "shell",
-      "requires": ["zsh", "nerdfonts"]
-    }
-  ]
+    # Write manifest — use python3 to avoid heredoc quote-stripping issues
+    python3 -c "
+import json
+manifest = {
+    'dotfiles': [
+        {'id':'zshrc_kali_default','name':'Kali Default','file':'zshrc_kali_default',
+         'target':'~/.zshrc','description':'Stock Kali Linux zshrc - unmodified default',
+         'category':'shell','requires':['zsh']},
+        {'id':'zshrc_p3ta','name':'p3ta','file':'zshrc',
+         'target':'~/.zshrc','description':'Oh-My-Zsh with Starship, FZF, Zoxide, modern aliases',
+         'category':'shell','requires':['zsh','starship','fzf','zoxide','eza','bat']},
+        {'id':'zshrc_jp','name':'JP','file':'zshrc_nerd',
+         'target':'~/.zshrc','description':'Kali-style zshrc with NerdFonts glyphs, completion, history',
+         'category':'shell','requires':['zsh','nerdfonts']}
+    ]
 }
-MANIFEST
+print(json.dumps(manifest, indent=2))
+" > "$DOTFILES_DIR/manifest.json"
     print_success "Dotfiles manifest created"
 fi
 
