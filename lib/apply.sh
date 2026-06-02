@@ -198,14 +198,15 @@ apply_bundle() {
         _progress 82 "Phase 3: pip — resolving and installing $pip_total packages..."
 
         local pip_fail_log="$PORTALGUN_LOG_DIR/pip_failures.log"
-        local pip_output
-        pip_output=$("$VENV_PIP" install --quiet -r "$req_file" 2>&1)
-        # Show and log real errors
-        echo "$pip_output" | grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
+        # Stream pip output directly — filter errors, log failures
+        "$VENV_PIP" install --quiet -r "$req_file" 2>&1 | \
+            tee /tmp/pg_pip_output.tmp | \
+            grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
             grep -v "dependency resolver does not currently" | tee -a "$pip_fail_log" || true
         local fail_count
-        fail_count=$(echo "$pip_output" | grep -c "^ERROR:\|× Failed" || echo 0)
+        fail_count=$(grep -c "^ERROR:\|× Failed" /tmp/pg_pip_output.tmp 2>/dev/null || echo 0)
         [ "$fail_count" -gt 0 ] && print_warning "$fail_count pip packages failed — see $pip_fail_log" || true
+        rm -f /tmp/pg_pip_output.tmp
 
         rm -f "$req_file"
 
