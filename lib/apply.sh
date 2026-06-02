@@ -324,6 +324,19 @@ apply_bundle() {
             sudo -u "$TARGET_USER" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
         fi
 
+        # Install zsh plugins
+        local ZSH_CUSTOM="$TARGET_HOME/.oh-my-zsh/custom"
+        if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
+            print_status "  Installing zsh-syntax-highlighting..."
+            sudo -u "$TARGET_USER" git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git \
+                "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+        fi
+        if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
+            print_status "  Installing zsh-autosuggestions..."
+            sudo -u "$TARGET_USER" git clone -q https://github.com/zsh-users/zsh-autosuggestions \
+                "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+        fi
+
         # Set zsh as default shell
         chsh -s /usr/bin/zsh "$TARGET_USER" 2>/dev/null || true
 
