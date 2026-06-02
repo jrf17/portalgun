@@ -284,6 +284,63 @@ apply_bundle() {
         echo ""
     fi
 
+    # ── Phase 5: dotfiles — apply p3ta config (zshrc, tmux, zellij) ──
+    _progress 96 "Phase 5: Applying p3ta dotfiles..."
+    print_status "Phase 5: dotfiles (p3ta default config)"
+
+    local CONFIGS_DIR="$PORTALGUN_REPO_DIR/configs"
+    local TARGET_USER="${SUDO_USER:-kali}"
+    local TARGET_HOME
+    TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
+    if [ -d "$CONFIGS_DIR" ] && [ -d "$TARGET_HOME" ]; then
+        # zshrc
+        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$TARGET_HOME/.zshrc" && \
+            chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.zshrc" && \
+            print_status "  zshrc → $TARGET_HOME/.zshrc"
+
+        # tmux
+        [ -f "$CONFIGS_DIR/tmux.conf" ] && cp "$CONFIGS_DIR/tmux.conf" "$TARGET_HOME/.tmux.conf" && \
+            chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.tmux.conf" && \
+            print_status "  tmux.conf → $TARGET_HOME/.tmux.conf"
+
+        # starship
+        mkdir -p "$TARGET_HOME/.config"
+        [ -f "$CONFIGS_DIR/starship.toml" ] && cp "$CONFIGS_DIR/starship.toml" "$TARGET_HOME/.config/starship.toml" && \
+            chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/starship.toml" && \
+            print_status "  starship.toml → $TARGET_HOME/.config/starship.toml"
+
+        # zellij
+        if [ -d "$CONFIGS_DIR/zellij" ]; then
+            mkdir -p "$TARGET_HOME/.config/zellij/layouts" "$TARGET_HOME/.config/zellij/plugins"
+            cp -r "$CONFIGS_DIR/zellij/"* "$TARGET_HOME/.config/zellij/" 2>/dev/null || true
+            chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/zellij"
+            print_status "  zellij config → $TARGET_HOME/.config/zellij/"
+        fi
+
+        # Install oh-my-zsh if not present
+        if [ ! -d "$TARGET_HOME/.oh-my-zsh" ]; then
+            print_status "  Installing oh-my-zsh..."
+            sudo -u "$TARGET_USER" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+        fi
+
+        # Set zsh as default shell
+        chsh -s /usr/bin/zsh "$TARGET_USER" 2>/dev/null || true
+
+        # Copy configs to dotfiles dir for web UI
+        local DOTFILES_DIR="/opt/tools-docs/dotfiles"
+        mkdir -p "$DOTFILES_DIR"
+        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$DOTFILES_DIR/zshrc"
+        [ -f "$CONFIGS_DIR/zshrc_nerd" ] && cp "$CONFIGS_DIR/zshrc_nerd" "$DOTFILES_DIR/zshrc_nerd"
+        [ -f "$CONFIGS_DIR/zshrc_kali_default" ] && cp "$CONFIGS_DIR/zshrc_kali_default" "$DOTFILES_DIR/zshrc_kali_default"
+        chown -R "$TARGET_USER:$TARGET_USER" "$DOTFILES_DIR"
+
+        print_success "Dotfiles applied (p3ta default)"
+    else
+        print_warning "Configs dir not found — skipping dotfiles phase"
+    fi
+    echo ""
+
     # Auto-register all installed tools so web UI search is populated
     _progress 99 "Registering tools in registry..."
     print_status "Running portalgun register to populate search..."
