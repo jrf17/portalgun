@@ -284,71 +284,94 @@ apply_bundle() {
         echo ""
     fi
 
-    # ── Phase 5: dotfiles — apply p3ta config (zshrc, tmux, zellij) ──
+    # ── Phase 5: dotfiles — apply p3ta config for root + first user ──
     _progress 96 "Phase 5: Applying p3ta dotfiles..."
     print_status "Phase 5: dotfiles (p3ta default config)"
 
     local CONFIGS_DIR="$PORTALGUN_REPO_DIR/configs"
-    local TARGET_USER="${SUDO_USER:-kali}"
-    local TARGET_HOME
-    TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 
-    if [ -d "$CONFIGS_DIR" ] && [ -d "$TARGET_HOME" ]; then
+    # Apply to both root and the sudo user (kali or whoever invoked sudo)
+    local FIRST_USER="${SUDO_USER:-kali}"
+    local USERS_TO_CONFIGURE=("root" "$FIRST_USER")
+
+    _apply_dotfiles_for_user() {
+        local user="$1"
+        local home
+        home=$(getent passwd "$user" | cut -d: -f6)
+        [ -z "$home" ] || [ ! -d "$home" ] && return
+
+        print_status "  Configuring $user ($home)..."
+
         # zshrc
-        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$TARGET_HOME/.zshrc" && \
-            chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.zshrc" && \
-            print_status "  zshrc → $TARGET_HOME/.zshrc"
+        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$home/.zshrc" && \
+            chown "$user:$user" "$home/.zshrc" 2>/dev/null || true
 
         # tmux
-        [ -f "$CONFIGS_DIR/tmux.conf" ] && cp "$CONFIGS_DIR/tmux.conf" "$TARGET_HOME/.tmux.conf" && \
-            chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.tmux.conf" && \
-            print_status "  tmux.conf → $TARGET_HOME/.tmux.conf"
+        [ -f "$CONFIGS_DIR/tmux.conf" ] && cp "$CONFIGS_DIR/tmux.conf" "$home/.tmux.conf" && \
+            chown "$user:$user" "$home/.tmux.conf" 2>/dev/null || true
 
         # starship
-        mkdir -p "$TARGET_HOME/.config"
-        [ -f "$CONFIGS_DIR/starship.toml" ] && cp "$CONFIGS_DIR/starship.toml" "$TARGET_HOME/.config/starship.toml" && \
-            chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/starship.toml" && \
-            print_status "  starship.toml → $TARGET_HOME/.config/starship.toml"
+        mkdir -p "$home/.config"
+        [ -f "$CONFIGS_DIR/starship.toml" ] && cp "$CONFIGS_DIR/starship.toml" "$home/.config/starship.toml" && \
+            chown -R "$user:$user" "$home/.config/starship.toml" 2>/dev/null || true
+
+        # kitty
+        mkdir -p "$home/.config/kitty"
+        [ -f "$CONFIGS_DIR/kitty.conf" ] && cp "$CONFIGS_DIR/kitty.conf" "$home/.config/kitty/kitty.conf" && \
+            chown -R "$user:$user" "$home/.config/kitty" 2>/dev/null || true
 
         # zellij
         if [ -d "$CONFIGS_DIR/zellij" ]; then
-            mkdir -p "$TARGET_HOME/.config/zellij/layouts" "$TARGET_HOME/.config/zellij/plugins"
-            cp -r "$CONFIGS_DIR/zellij/"* "$TARGET_HOME/.config/zellij/" 2>/dev/null || true
-            chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/zellij"
-            print_status "  zellij config → $TARGET_HOME/.config/zellij/"
+            mkdir -p "$home/.config/zellij/layouts" "$home/.config/zellij/plugins"
+            cp -r "$CONFIGS_DIR/zellij/"* "$home/.config/zellij/" 2>/dev/null || true
+            chown -R "$user:$user" "$home/.config/zellij" 2>/dev/null || true
         fi
 
-        # Install oh-my-zsh if not present
-        if [ ! -d "$TARGET_HOME/.oh-my-zsh" ]; then
-            print_status "  Installing oh-my-zsh..."
-            sudo -u "$TARGET_USER" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+        # oh-my-zsh
+        if [ ! -d "$home/.oh-my-zsh" ]; then
+            print_status "    Installing oh-my-zsh for $user..."
+            if [ "$user" = "root" ]; then
+                sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+            else
+                sudo -u "$user" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+            fi
         fi
 
-        # Install zsh plugins
-        local ZSH_CUSTOM="$TARGET_HOME/.oh-my-zsh/custom"
+        # zsh plugins
+        local ZSH_CUSTOM="$home/.oh-my-zsh/custom"
         if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
-            print_status "  Installing zsh-syntax-highlighting..."
-            sudo -u "$TARGET_USER" git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git \
-                "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+            if [ "$user" = "root" ]; then
+                git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+            else
+                sudo -u "$user" git clone -q https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+            fi
         fi
         if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
-            print_status "  Installing zsh-autosuggestions..."
-            sudo -u "$TARGET_USER" git clone -q https://github.com/zsh-users/zsh-autosuggestions \
-                "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+            if [ "$user" = "root" ]; then
+                git clone -q https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+            else
+                sudo -u "$user" git clone -q https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+            fi
         fi
 
         # Set zsh as default shell
-        chsh -s /usr/bin/zsh "$TARGET_USER" 2>/dev/null || true
+        chsh -s /usr/bin/zsh "$user" 2>/dev/null || true
+        print_success "    $user: dotfiles applied, zsh set as default"
+    }
 
-        # Copy configs to dotfiles dir for web UI
+    if [ -d "$CONFIGS_DIR" ]; then
+        for user in "${USERS_TO_CONFIGURE[@]}"; do
+            _apply_dotfiles_for_user "$user"
+        done
+
+        # Copy configs to dotfiles dir for web UI Config Manager
         local DOTFILES_DIR="/opt/tools-docs/dotfiles"
         mkdir -p "$DOTFILES_DIR"
-        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$DOTFILES_DIR/zshrc"
-        [ -f "$CONFIGS_DIR/zshrc_nerd" ] && cp "$CONFIGS_DIR/zshrc_nerd" "$DOTFILES_DIR/zshrc_nerd"
-        [ -f "$CONFIGS_DIR/zshrc_kali_default" ] && cp "$CONFIGS_DIR/zshrc_kali_default" "$DOTFILES_DIR/zshrc_kali_default"
-        chown -R "$TARGET_USER:$TARGET_USER" "$DOTFILES_DIR"
-
-        print_success "Dotfiles applied (p3ta default)"
+        for f in zshrc zshrc_nerd zshrc_kali_default kitty.conf starship.toml; do
+            [ -f "$CONFIGS_DIR/$f" ] && cp "$CONFIGS_DIR/$f" "$DOTFILES_DIR/$f"
+        done
+        chown -R "$FIRST_USER:$FIRST_USER" "$DOTFILES_DIR"
+        print_success "Dotfiles applied for: ${USERS_TO_CONFIGURE[*]}"
     else
         print_warning "Configs dir not found — skipping dotfiles phase"
     fi
