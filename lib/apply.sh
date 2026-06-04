@@ -11,6 +11,77 @@ _progress() {
     echo "PROGRESS:${pct}:${label}"
 }
 
+
+
+# Hoisted out of apply_bundle — bash nested functions pollute global scope
+_apply_dotfiles_for_user() {
+    local user="$1" CONFIGS_DIR="$2"
+    local home
+    home=$(getent passwd "$user" | cut -d: -f6)
+    [ -z "$home" ] || [ ! -d "$home" ] && return
+
+    print_status "  Configuring $user ($home)..."
+
+    [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$home/.zshrc" && chown "$user:$user" "$home/.zshrc" 2>/dev/null || true
+    [ -f "$CONFIGS_DIR/tmux.conf" ] && cp "$CONFIGS_DIR/tmux.conf" "$home/.tmux.conf" && chown "$user:$user" "$home/.tmux.conf" 2>/dev/null || true
+    mkdir -p "$home/.config"
+    [ -f "$CONFIGS_DIR/starship.toml" ] && cp "$CONFIGS_DIR/starship.toml" "$home/.config/starship.toml" && chown "$user:$user" "$home/.config/starship.toml" 2>/dev/null || true
+    mkdir -p "$home/.config/kitty"
+    [ -f "$CONFIGS_DIR/kitty.conf" ] && cp "$CONFIGS_DIR/kitty.conf" "$home/.config/kitty/kitty.conf" && chown -R "$user:$user" "$home/.config/kitty" 2>/dev/null || true
+
+    # zellij
+    local ZELLIJ_CONFIGS="$CONFIGS_DIR/zellij"
+    if [ -d "$ZELLIJ_CONFIGS" ]; then
+        mkdir -p "$home/.config/zellij/layouts" "$home/.config/zellij/plugins"
+        cp -r "$ZELLIJ_CONFIGS/"* "$home/.config/zellij/" 2>/dev/null || true
+        chown -R "$user:$user" "$home/.config/zellij" 2>/dev/null || true
+    fi
+
+    # oh-my-zsh
+    if [ ! -d "$home/.oh-my-zsh" ]; then
+        print_status "    Installing oh-my-zsh for $user..."
+        if [ "$user" = "root" ]; then
+            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+        else
+            sudo -u "$user" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
+        fi
+        # oh-my-zsh overwrites .zshrc — restore our config
+        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$home/.zshrc" && chown "$user:$user" "$home/.zshrc" 2>/dev/null || true
+    fi
+
+    # zsh plugins
+    local ZSH_CUSTOM="$home/.oh-my-zsh/custom"
+    for plugin_url in "https://github.com/zsh-users/zsh-syntax-highlighting.git" "https://github.com/zsh-users/zsh-autosuggestions"; do
+        local plugin_name
+        plugin_name=$(basename "$plugin_url" .git)
+        if [ ! -d "$ZSH_CUSTOM/plugins/$plugin_name" ]; then
+            [ "$user" = "root" ] && git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
+            [ "$user" != "root" ] && sudo -u "$user" git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
+        fi
+    done
+
+    # TPM + tmux plugins — pre-clone (TPM headless install doesn't work outside tmux session)
+    mkdir -p "$home/.tmux/plugins"
+    if [ ! -d "$home/.tmux/plugins/tpm" ]; then
+        [ "$user" = "root" ] && git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
+        [ "$user" != "root" ] && sudo -u "$user" git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
+    fi
+    for plugin_url in "https://github.com/tmux-plugins/tmux-sensible" "https://github.com/tmux-plugins/tmux-resurrect" "https://github.com/tmux-plugins/tmux-yank"; do
+        local plugin_name
+        plugin_name=$(basename "$plugin_url")
+        if [ ! -d "$home/.tmux/plugins/$plugin_name" ]; then
+            [ "$user" = "root" ] && git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
+            [ "$user" != "root" ] && sudo -u "$user" git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
+        fi
+    done
+
+    # Only chsh if not already zsh — don't force it unconditionally
+    local current_shell
+    current_shell=$(getent passwd "$user" | cut -d: -f7)
+    [ "$current_shell" != "/usr/bin/zsh" ] && chsh -s /usr/bin/zsh "$user" 2>/dev/null || true
+    print_success "    $user: shell + tmux + zellij configured"
+}
+
 apply_bundle() {
     # Separate bundle file from flags — first non-flag arg is the bundle path
     local bundle_file=""
@@ -96,21 +167,19 @@ apply_bundle() {
         if [ "$apt_total" -gt 0 ]; then
             _progress 2 "Phase 1: Downloading apt packages ($apt_total)..."
             local apt_done=0
-            DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_needed[@]}" 2>&1 | \
-                while IFS= read -r line; do
-                    if echo "$line" | grep -qE "^Setting up|^Unpacking"; then
-                        local pkg_name
-                        # "Setting up nmap (1.2.3)..." or "Unpacking nmap (1.2.3)..."
-                        pkg_name=$(echo "$line" | sed 's/^Setting up //;s/^Unpacking //' | grep -oE '^[a-z][a-z0-9.+_-]+')
-                        apt_done=$(( apt_done + 1 ))
-                        # apt occupies 2–34% — cap at total to avoid overflow
-                        local display_done=$(( apt_done > apt_total ? apt_total : apt_done ))
-                        local pct=$(( 2 + ( display_done * 32 / apt_total ) ))
-                        [ "$pct" -gt 34 ] && pct=34
-                        _progress "$pct" "Phase 1: apt [$display_done/$apt_total] $pkg_name"
-                        printf "  ${BLUE}[apt]${NC} [%d/%d] %s\n" "$display_done" "$apt_total" "$pkg_name"
-                    fi
-                done
+            # Use process substitution (not pipe) to avoid subshell variable loss
+            while IFS= read -r line; do
+                if echo "$line" | grep -qE "^Setting up|^Unpacking"; then
+                    local pkg_name
+                    pkg_name=$(echo "$line" | sed 's/^Setting up //;s/^Unpacking //' | grep -oE '^[a-z][a-z0-9.+_-]+')
+                    (( apt_done++ )) || true
+                    local display_done=$(( apt_done > apt_total ? apt_total : apt_done ))
+                    local pct=$(( 2 + ( display_done * 32 / apt_total ) ))
+                    [ "$pct" -gt 34 ] && pct=34
+                    _progress "$pct" "Phase 1: apt [$display_done/$apt_total] $pkg_name"
+                    printf "  ${BLUE}[apt]${NC} [%d/%d] %s\n" "$display_done" "$apt_total" "$pkg_name"
+                fi
+            done < <(DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_needed[@]}" 2>&1)
 
             for pkg in "${apt_needed[@]}"; do
                 if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
@@ -197,16 +266,23 @@ apply_bundle() {
         print_status "  Installing $pip_total packages via requirements.txt..."
         _progress 82 "Phase 3: pip — resolving and installing $pip_total packages..."
 
-        local pip_fail_log="$PORTALGUN_LOG_DIR/pip_failures.log"
-        # Stream pip output directly — filter errors, log failures
+        # Use mktemp for safety — never reuse fixed /tmp paths as root
+        local pip_tmp pip_fail_log
+        pip_tmp=$(mktemp /tmp/pg_pip_XXXXXX.tmp)
+        chmod 600 "$pip_tmp"
+        pip_fail_log="$PORTALGUN_LOG_DIR/pip_failures.log"
+        # Stream pip output — capture all, show only real errors
         "$VENV_PIP" install --quiet -r "$req_file" 2>&1 | \
-            tee /tmp/pg_pip_output.tmp | \
+            tee "$pip_tmp" | \
             grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
-            grep -v "dependency resolver does not currently" | tee -a "$pip_fail_log" || true
+            grep -v "dependency resolver does not currently" || true
         local fail_count
-        fail_count=$(grep -c "^ERROR:\|× Failed" /tmp/pg_pip_output.tmp 2>/dev/null || echo 0)
-        [ "$fail_count" -gt 0 ] && print_warning "$fail_count pip packages failed — see $pip_fail_log" || true
-        rm -f /tmp/pg_pip_output.tmp
+        fail_count=$(grep -cE "^ERROR:|× Failed" "$pip_tmp" 2>/dev/null || echo 0)
+        if [ "${fail_count:-0}" -gt 0 ]; then
+            grep -E "^ERROR:|× Failed" "$pip_tmp" >> "$pip_fail_log" 2>/dev/null || true
+            print_warning "$fail_count pip packages failed — see $pip_fail_log"
+        fi
+        rm -f "$pip_tmp"
 
         rm -f "$req_file"
 
@@ -259,7 +335,7 @@ apply_bundle() {
                 fi
 
                 printf "  ${BLUE}[cargo]${NC} %s ... " "$pkg_name"
-                if cargo install "$pkg_name" --quiet 2>/dev/null || true; then
+                if cargo install "$pkg_name" --quiet 2>/dev/null; then
                     local ver
                     ver=$(cargo install --list 2>/dev/null | grep "^${pkg_name} " | head -1 | sed 's/.* v//;s/:.*//')
                     local json
@@ -294,104 +370,6 @@ apply_bundle() {
     local FIRST_USER="${SUDO_USER:-kali}"
     local USERS_TO_CONFIGURE=("root" "$FIRST_USER")
 
-    _apply_dotfiles_for_user() {
-        local user="$1"
-        local home
-        home=$(getent passwd "$user" | cut -d: -f6)
-        [ -z "$home" ] || [ ! -d "$home" ] && return
-
-        print_status "  Configuring $user ($home)..."
-
-        # zshrc
-        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$home/.zshrc" && \
-            chown "$user:$user" "$home/.zshrc" 2>/dev/null || true
-
-        # tmux
-        [ -f "$CONFIGS_DIR/tmux.conf" ] && cp "$CONFIGS_DIR/tmux.conf" "$home/.tmux.conf" && \
-            chown "$user:$user" "$home/.tmux.conf" 2>/dev/null || true
-
-        # starship
-        mkdir -p "$home/.config"
-        [ -f "$CONFIGS_DIR/starship.toml" ] && cp "$CONFIGS_DIR/starship.toml" "$home/.config/starship.toml" && \
-            chown -R "$user:$user" "$home/.config/starship.toml" 2>/dev/null || true
-
-        # kitty
-        mkdir -p "$home/.config/kitty"
-        [ -f "$CONFIGS_DIR/kitty.conf" ] && cp "$CONFIGS_DIR/kitty.conf" "$home/.config/kitty/kitty.conf" && \
-            chown -R "$user:$user" "$home/.config/kitty" 2>/dev/null || true
-
-        # zellij
-        if [ -d "$CONFIGS_DIR/zellij" ]; then
-            mkdir -p "$home/.config/zellij/layouts" "$home/.config/zellij/plugins"
-            cp -r "$CONFIGS_DIR/zellij/"* "$home/.config/zellij/" 2>/dev/null || true
-            chown -R "$user:$user" "$home/.config/zellij" 2>/dev/null || true
-        fi
-
-        # oh-my-zsh
-        if [ ! -d "$home/.oh-my-zsh" ]; then
-            print_status "    Installing oh-my-zsh for $user..."
-            if [ "$user" = "root" ]; then
-                sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
-            else
-                sudo -u "$user" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
-            fi
-        fi
-
-        # zsh plugins
-        local ZSH_CUSTOM="$home/.oh-my-zsh/custom"
-        for plugin_url in \
-            "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
-            "https://github.com/zsh-users/zsh-autosuggestions"; do
-            local plugin_name
-            plugin_name=$(basename "$plugin_url" .git)
-            if [ ! -d "$ZSH_CUSTOM/plugins/$plugin_name" ]; then
-                if [ "$user" = "root" ]; then
-                    git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
-                else
-                    sudo -u "$user" git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
-                fi
-            fi
-        done
-
-        # TPM + tmux plugins
-        mkdir -p "$home/.tmux/plugins"
-        if [ ! -d "$home/.tmux/plugins/tpm" ]; then
-            if [ "$user" = "root" ]; then
-                git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
-            else
-                sudo -u "$user" git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
-            fi
-        fi
-        # Pre-install tmux plugins (can't use TPM headlessly — clone directly)
-        for plugin_url in \
-            "https://github.com/tmux-plugins/tmux-sensible" \
-            "https://github.com/tmux-plugins/tmux-resurrect" \
-            "https://github.com/tmux-plugins/tmux-yank"; do
-            local plugin_name
-            plugin_name=$(basename "$plugin_url")
-            if [ ! -d "$home/.tmux/plugins/$plugin_name" ]; then
-                if [ "$user" = "root" ]; then
-                    git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
-                else
-                    sudo -u "$user" git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
-                fi
-            fi
-        done
-
-        # zellij config
-        mkdir -p "$home/.config/zellij/layouts" "$home/.config/zellij/plugins"
-        local ZELLIJ_CONFIGS="$CONFIGS_DIR/zellij"
-        [ -f "$ZELLIJ_CONFIGS/config.kdl" ] && cp "$ZELLIJ_CONFIGS/config.kdl" "$home/.config/zellij/config.kdl"
-        [ -f "$ZELLIJ_CONFIGS/themes.kdl" ] && cp "$ZELLIJ_CONFIGS/themes.kdl" "$home/.config/zellij/themes.kdl"
-        [ -f "$ZELLIJ_CONFIGS/layouts/default.kdl" ] && cp "$ZELLIJ_CONFIGS/layouts/default.kdl" "$home/.config/zellij/layouts/default.kdl"
-        [ -f "$ZELLIJ_CONFIGS/plugins/zjstatus.wasm" ] && cp "$ZELLIJ_CONFIGS/plugins/zjstatus.wasm" "$home/.config/zellij/plugins/zjstatus.wasm"
-        chown -R "$user:$user" "$home/.config/zellij" 2>/dev/null || true
-
-        # Set zsh as default shell
-        chsh -s /usr/bin/zsh "$user" 2>/dev/null || true
-        print_success "    $user: shell + tmux + zellij configured"
-    }
-
     # Install zellij binary (too large to compile via cargo on a VM)
     if ! command -v zellij >/dev/null 2>&1; then
         _progress 97 "Phase 5: Installing zellij binary..."
@@ -404,7 +382,7 @@ apply_bundle() {
 
     if [ -d "$CONFIGS_DIR" ]; then
         for user in "${USERS_TO_CONFIGURE[@]}"; do
-            _apply_dotfiles_for_user "$user"
+            _apply_dotfiles_for_user "$user" "$CONFIGS_DIR"
         done
 
         # Copy configs to dotfiles dir for web UI Config Manager

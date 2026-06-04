@@ -10,8 +10,8 @@ update_all() {
     local pip_ok=0 pip_fail=0
     local cargo_ok=0 cargo_fail=0
 
-    # Allow git to operate on repos cloned by root
-    git config --global --add safe.directory '*' 2>/dev/null || true
+    # Allow git to operate on repos cloned by root — scoped to tools dir only
+    git config --global --add safe.directory "$PORTALGUN_TOOLS_BASE/*" 2>/dev/null || true
 
     # ── Phase 1: APT ─────────────────────────────────────────────────
     print_status "Phase 1: apt update + upgrade"
@@ -37,14 +37,24 @@ update_all() {
         print_warning "No cloned repos found under $PORTALGUN_TOOLS_BASE"
     else
         print_status "Found ${#git_repos[@]} repos"
+
+        # Build O(1) registry index — avoid grep -rl per repo (O(n²))
+        declare -A _reg_idx
+        for _rf in "$PORTALGUN_REGISTRY/github/"*.json; do
+            [ -f "$_rf" ] || continue
+            local _td
+            _td=$(jq -r '.tool_dir // ""' "$_rf" 2>/dev/null)
+            [ -n "$_td" ] && _reg_idx["$_td"]="$_rf"
+        done
+
         for src_dir in "${git_repos[@]}"; do
             local name old_commit build_cmd=""
             name=$(basename "$(dirname "$src_dir")")/$(basename "$src_dir")
             old_commit=$(git -C "$src_dir" rev-parse HEAD 2>/dev/null | cut -c1-7)
 
-            local tool_dir reg_file
+            local tool_dir reg_file=""
             tool_dir=$(dirname "$src_dir")
-            reg_file=$(grep -rl "\"tool_dir\": \"$tool_dir\"" "$PORTALGUN_REGISTRY/github/" 2>/dev/null | head -1)
+            reg_file="${_reg_idx[$tool_dir]:-}"
             [ -n "$reg_file" ] && build_cmd=$(jq -r '.build_cmd // ""' "$reg_file")
 
             printf "  ${BLUE}[git]${NC}  %-35s ... " "$name"

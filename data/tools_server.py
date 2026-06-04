@@ -13,18 +13,54 @@ import re
 import uuid
 import threading
 import time
+import tempfile
+import fcntl
+import shlex
 from datetime import datetime
 
 ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mGKHFABCDJn]')
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2MB max request body
 
-# Background job tracking for long-running installs
-JOBS = {}  # job_id -> {log, proc, done, rc}
+# Background job tracking — protected by lock
+JOBS = {}
+JOBS_LOCK = threading.Lock()
 
 DOCS_DIR = '/opt/tools-docs'
 DOTFILES_DIR = os.path.join(DOCS_DIR, 'dotfiles')
 HOME_DIR = os.path.expanduser('~')
+
+# Janitor: clean up old job logs every hour
+def _jobs_janitor():
+    while True:
+        time.sleep(3600)
+        cutoff = time.time() - 3600
+        with JOBS_LOCK:
+            expired = [jid for jid, j in JOBS.items()
+                       if j.get('done') and j.get('started', 0) < cutoff]
+            for jid in expired:
+                log = JOBS[jid].get('log')
+                if log and os.path.exists(log):
+                    try: os.unlink(log)
+                    except: pass
+                del JOBS[jid]
+
+threading.Thread(target=_jobs_janitor, daemon=True).start()
+
+# Input validation helpers
+_SAFE_PKG = re.compile(r'^[a-z0-9][a-z0-9+._-]*$')
+_SAFE_URL = re.compile(r'^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?/?$')
+_SAFE_SCRIPT = re.compile(r'^[A-Za-z0-9_.-]+(\.sh|\.py)?$')
+
+def _safe_target(path):
+    """Expand ~ and reject path traversal — target must be under HOME_DIR"""
+    expanded = os.path.realpath(os.path.expanduser(path))
+    # Allow HOME_DIR and /opt/tools-docs/dotfiles
+    allowed_roots = [os.path.realpath(HOME_DIR), os.path.realpath(DOTFILES_DIR)]
+    if not any(expanded.startswith(r) for r in allowed_roots):
+        return None
+    return expanded
 
 @app.route('/')
 def index():
@@ -57,7 +93,7 @@ def install_dotfile():
 
         # Source and target paths
         source = os.path.join(DOTFILES_DIR, dotfile['file'])
-        target = dotfile['target'].replace('~', HOME_DIR)
+        target = os.path.expanduser(dotfile['target'])
 
         # Create target directory if needed
         target_dir = os.path.dirname(target)
@@ -201,7 +237,7 @@ def edit_dotfile():
             return jsonify({'success': False, 'error': 'Dotfile not found'}), 404
 
         # Target path
-        target = dotfile['target'].replace('~', HOME_DIR)
+        target = os.path.expanduser(dotfile['target'])
 
         # Set display for GUI apps
         env = os.environ.copy()
@@ -285,7 +321,7 @@ def install_config():
                 return jsonify({'success': False, 'error': 'Config not found'}), 404
 
             source = os.path.join(DOTFILES_DIR, dotfile['file'])
-            target = dotfile['target'].replace('~', HOME_DIR)
+            target = os.path.expanduser(dotfile['target'])
 
         elif config_type == 'zellij-config':
             if config_id not in ZELLIJ_PRESETS:
@@ -460,7 +496,7 @@ def edit_file():
     """Open a file in nvim"""
     try:
         data = request.json
-        target = data.get('target', '').replace('~', HOME_DIR)
+        target = os.path.expanduser(data.get('target', ''))
 
         if not target:
             return jsonify({'success': False, 'error': 'No target specified'}), 400
@@ -1008,16 +1044,21 @@ def admin_install():
                 cmd.append(f"--phases={','.join(phases)}")
 
         job_id = str(uuid.uuid4())[:8]
-        log_path = f'/tmp/pg_job_{job_id}.log'
-        log_file = open(log_path, 'w')
+        # Use secure temp file — not world-readable fixed path
+        fd, log_path = tempfile.mkstemp(dir='/var/log/portalgun', prefix=f'pg_job_{job_id}_', suffix='.log')
+        os.chmod(log_path, 0o600)
+        log_file = os.fdopen(fd, 'w')
         proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT)
-        JOBS[job_id] = {'log': log_path, 'proc': proc, 'done': False, 'rc': None}
+        with JOBS_LOCK:
+            JOBS[job_id] = {'log': log_path, 'proc': proc, 'done': False, 'rc': None, 'started': time.time()}
 
         def _monitor(jid, p, lf):
             p.wait()
             lf.close()
-            JOBS[jid]['done'] = True
-            JOBS[jid]['rc'] = p.returncode
+            with JOBS_LOCK:
+                if jid in JOBS:
+                    JOBS[jid]['done'] = True
+                    JOBS[jid]['rc'] = p.returncode
         threading.Thread(target=_monitor, args=(job_id, proc, log_file), daemon=True).start()
 
         return jsonify({'job_id': job_id})
@@ -1164,17 +1205,18 @@ def admin_install():
 
 @app.route('/api/admin/job/<job_id>/stop', methods=['POST'])
 def job_stop(job_id):
-    job = JOBS.get(job_id)
-    if not job:
-        return jsonify({'error': 'job not found'}), 404
-    proc = job.get('proc')
-    if proc and proc.poll() is None:
-        proc.terminate()
-        import time; time.sleep(1)
-        if proc.poll() is None:
-            proc.kill()
-    job['done'] = True
-    job['rc'] = -1
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if not job:
+            return jsonify({'error': 'job not found'}), 404
+        proc = job.get('proc')
+        if proc and proc.poll() is None:
+            proc.terminate()
+            time.sleep(1)
+            if proc.poll() is None:
+                proc.kill()
+        job['done'] = True
+        job['rc'] = -1
     return jsonify({'stopped': True})
 
 

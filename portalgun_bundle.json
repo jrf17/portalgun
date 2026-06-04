@@ -902,6 +902,8 @@
       "python3-construct",
       "python3-docutils",
       "python3-fabric",
+      "python3-flask",
+      "python3-flask-cors",
       "python3-fuzzywuzzy",
       "python3-github",
       "python3-humanfriendly",
