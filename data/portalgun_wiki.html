@@ -722,6 +722,218 @@
     </table>
 
     <p>All individual installs stream output in the terminal and append the new entry to the registry. Run <code>portalgun export</code> afterwards to persist the change to <code>portalgun_bundle.json</code>.</p>
+
+    <h4 style="margin-top:2rem;">Admin Console — UI Layout</h4>
+    <p>The complete admin console layout, including phase selector checkboxes, individual install tabs, progress bar, and streaming output:</p>
+
+    <div class="ui-mockup">
+      <!-- Modal header -->
+      <div class="ui-modal-header">
+        <span class="ui-title">Admin Console</span>
+        <div class="ui-header-actions">
+          <button class="ui-btn ui-btn-export">↓ Export Bundle</button>
+          <button class="ui-btn ui-btn-close">Close</button>
+        </div>
+      </div>
+
+      <!-- Top: Install All + Update All grid -->
+      <div class="ui-top-grid">
+        <div class="ui-card ui-card-install">
+          <div class="ui-card-title" style="color:var(--yellow);">Install All</div>
+          <div class="ui-card-sub">Select phases to install:</div>
+          <div class="ui-checkboxes">
+            <label><input type="checkbox" checked> apt</label>
+            <label><input type="checkbox" checked> github</label>
+            <label><input type="checkbox" checked> pip</label>
+            <label><input type="checkbox" checked> cargo</label>
+          </div>
+          <button class="ui-btn ui-btn-install">▶ Install All</button>
+        </div>
+        <div class="ui-card">
+          <div class="ui-card-title" style="color:var(--blue);">Update All</div>
+          <div class="ui-card-sub">apt upgrade + git pull + rebuild all registered tools</div>
+          <button class="ui-btn ui-btn-update">↻ Update All</button>
+        </div>
+      </div>
+
+      <!-- Individual install tabs -->
+      <div class="ui-tabs">
+        <button class="ui-tab ui-tab-active">APT</button>
+        <button class="ui-tab">GitHub</button>
+        <button class="ui-tab">pip</button>
+        <button class="ui-tab">cargo</button>
+      </div>
+
+      <div class="ui-tab-content">
+        <div class="ui-form-label">Installs via <code>portalgun install apt</code> — registered in registry, synced to rebuild scripts.</div>
+        <div class="ui-form-row">
+          <div class="ui-form-field">
+            <div class="ui-form-label-sm">Package name</div>
+            <input type="text" placeholder="e.g. nmap, gobuster, ffuf" class="ui-input" disabled>
+          </div>
+          <button class="ui-btn ui-btn-install-sm">Install</button>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="ui-progress-section">
+        <div class="ui-progress-header">
+          <span class="ui-progress-label">Phase 2: GitHub [142/187] arjun (~12m remaining)</span>
+          <span class="ui-progress-pct">62%</span>
+        </div>
+        <div class="ui-progress-bar">
+          <div class="ui-pb-apt"></div>
+          <div class="ui-pb-github" style="width:27%;"></div>
+          <div class="ui-pb-pip" style="width:0%;"></div>
+          <div class="ui-pb-cargo" style="width:0%;"></div>
+        </div>
+        <div class="ui-progress-legend">
+          <span><span class="dot dot-blue"></span> apt 35%</span>
+          <span><span class="dot dot-purple"></span> github 45%</span>
+          <span><span class="dot dot-yellow"></span> pip 15%</span>
+          <span><span class="dot dot-red"></span> cargo 5%</span>
+        </div>
+      </div>
+
+      <!-- Streaming output -->
+      <div class="ui-output-section">
+        <div class="ui-output-header">
+          <span>Output</span>
+          <div>
+            <button class="ui-btn-sm ui-btn-stop">■ Stop</button>
+            <button class="ui-btn-sm">Clear</button>
+          </div>
+        </div>
+        <pre class="ui-output-pre"><span class="ok">[*] Applying bundle (v2): 1042 apt, 187 github, 822 pip, 1 cargo</span>
+<span class="ok">[*] Phase 1: apt packages (1042)</span>
+<span class="dim">[*]   1037 already installed, 5 to install</span>
+<span class="ok">[apt] [1042/1042] kitty</span>
+<span class="ok">[*] apt phase complete</span>
+<span class="ok">[*] Phase 2: github tools (187)</span>
+<span class="ok">  [git]  certipy ... ok</span>
+<span class="ok">  [git]  bloodhound.py ... ok</span>
+<span class="ok">  [git]  arjun ... <span class="dim">cloning</span></span>
+<span class="dim">▎</span></pre>
+      </div>
+    </div>
+
+    <style>
+      .ui-mockup {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        font-family: ui-monospace, "JetBrains Mono", monospace;
+        font-size: 0.78rem;
+      }
+      .ui-modal-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 1.2rem; padding-bottom: 0.8rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .ui-title { color: var(--yellow); font-size: 1.05rem; font-weight: 600; }
+      .ui-header-actions { display: flex; gap: 0.5rem; }
+      .ui-btn {
+        background: var(--overlay); border: 1px solid var(--border);
+        color: var(--text); padding: 0.4rem 0.9rem; border-radius: 5px;
+        cursor: default; font-size: 0.75rem;
+      }
+      .ui-btn-export { color: var(--green); border-color: var(--green); }
+      .ui-btn-install {
+        width: 100%; background: var(--green); border-color: var(--green);
+        color: var(--base); font-weight: 600; padding: 0.6rem; margin-top: 0.4rem;
+      }
+      .ui-btn-update {
+        width: 100%; background: var(--blue); border-color: var(--blue);
+        color: var(--base); font-weight: 600; padding: 0.6rem; margin-top: 0.4rem;
+      }
+      .ui-btn-install-sm {
+        background: var(--green); border-color: var(--green); color: var(--base);
+        font-weight: 600; padding: 0.5rem 1rem; align-self: end;
+      }
+      .ui-btn-stop { background: transparent; border: 1px solid var(--red); color: var(--red); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; }
+      .ui-btn-sm { background: transparent; border: 1px solid var(--border); color: var(--subtext0); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; margin-left: 0.3rem; }
+
+      .ui-top-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 1.2rem;
+      }
+      .ui-card {
+        background: var(--overlay); border: 1px solid var(--border);
+        border-radius: 6px; padding: 1rem;
+      }
+      .ui-card-title { font-weight: 600; margin-bottom: 0.3rem; }
+      .ui-card-sub { color: var(--subtext0); font-size: 0.72rem; margin-bottom: 0.6rem; }
+      .ui-checkboxes { display: flex; gap: 0.8rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+      .ui-checkboxes label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--text); }
+      .ui-checkboxes input { accent-color: var(--purple); }
+
+      .ui-tabs { display: flex; gap: 0.4rem; margin-bottom: 0.8rem; }
+      .ui-tab {
+        background: var(--overlay); border: 1px solid var(--border);
+        color: var(--subtext0); padding: 0.45rem 1.1rem; border-radius: 5px;
+        font-size: 0.78rem; cursor: default;
+      }
+      .ui-tab-active { background: var(--blue); border-color: var(--blue); color: var(--base); font-weight: 600; }
+
+      .ui-tab-content {
+        background: var(--overlay); border: 1px solid var(--border);
+        border-radius: 6px; padding: 1rem; margin-bottom: 1.2rem;
+      }
+      .ui-form-label { color: var(--subtext0); font-size: 0.72rem; margin-bottom: 0.8rem; }
+      .ui-form-label-sm { color: var(--subtext0); font-size: 0.7rem; margin-bottom: 0.3rem; }
+      .ui-form-row { display: grid; grid-template-columns: 1fr auto; gap: 0.6rem; align-items: end; }
+      .ui-form-field { display: flex; flex-direction: column; }
+      .ui-input {
+        background: var(--base); border: 1px solid var(--border); color: var(--text);
+        padding: 0.5rem 0.8rem; border-radius: 5px; font-family: inherit; font-size: 0.78rem;
+      }
+
+      .ui-progress-section {
+        background: var(--overlay); border: 1px solid var(--border);
+        border-radius: 6px; padding: 1rem; margin-bottom: 1.2rem;
+      }
+      .ui-progress-header {
+        display: flex; justify-content: space-between; margin-bottom: 0.5rem;
+        font-size: 0.74rem;
+      }
+      .ui-progress-label { color: var(--subtext0); }
+      .ui-progress-pct { color: var(--purple); font-weight: 600; }
+      .ui-progress-bar {
+        height: 10px; background: var(--base); border-radius: 5px; overflow: hidden;
+        display: flex; margin-bottom: 0.5rem;
+      }
+      .ui-pb-apt    { width: 35%; background: var(--blue); }
+      .ui-pb-github { background: var(--purple); }
+      .ui-pb-pip    { background: var(--yellow); }
+      .ui-pb-cargo  { background: var(--red); }
+      .ui-progress-legend {
+        display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.7rem; color: var(--subtext0);
+      }
+      .ui-progress-legend span { display: flex; align-items: center; gap: 0.3rem; }
+      .dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+      .dot-blue { background: var(--blue); }
+      .dot-purple { background: var(--purple); }
+      .dot-yellow { background: var(--yellow); }
+      .dot-red { background: var(--red); }
+
+      .ui-output-section {
+        background: var(--overlay); border: 1px solid var(--border);
+        border-radius: 6px; padding: 0.8rem;
+      }
+      .ui-output-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 0.6rem; font-size: 0.74rem; color: var(--subtext0);
+      }
+      .ui-output-pre {
+        background: var(--base); border: 1px solid var(--border);
+        border-radius: 5px; padding: 0.9rem; margin: 0;
+        font-size: 0.72rem; line-height: 1.5; max-height: 200px; overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      .ui-output-pre .ok  { color: var(--green); }
+      .ui-output-pre .dim { color: var(--subtext0); }
+    </style>
   </section>
 
   <section class="section" id="admin-progress">
