@@ -1792,10 +1792,6 @@
         "target": "/opt/tools/windows/ad"
       },
       {
-        "url": "https://github.com/zellij-org/zellij.git",
-        "target": "/opt/tools/linux/shells"
-      },
-      {
         "url": "https://github.com/jesseduffield/lazydocker.git",
         "target": "/opt/tools/linux/misc"
       }
