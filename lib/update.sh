@@ -190,11 +190,93 @@ update_all() {
     fi
     echo ""
 
+    # ── Phase 5: binary tools (zellij, yazi, lazydocker) ─────────────
+    local bin_ok=0 bin_fail=0
+    print_status "Phase 5: binary tools (zellij, yazi, lazydocker)"
+
+    # Zellij — check latest release vs installed
+    if command -v zellij >/dev/null 2>&1; then
+        local current_zellij latest_zellij
+        current_zellij=$(zellij --version 2>/dev/null | awk '{print $2}')
+        latest_zellij=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest 2>/dev/null | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
+        if [ -n "$latest_zellij" ] && [ "$current_zellij" != "$latest_zellij" ]; then
+            print_status "  zellij: $current_zellij → $latest_zellij"
+            if curl -sL "https://github.com/zellij-org/zellij/releases/download/v${latest_zellij}/zellij-x86_64-unknown-linux-musl.tar.gz" | tar xz -C /usr/local/bin/ 2>/dev/null; then
+                print_success "  zellij updated to $latest_zellij"
+                bin_ok=$(( bin_ok + 1 ))
+            else
+                print_error "  zellij update failed"
+                bin_fail=$(( bin_fail + 1 ))
+            fi
+        else
+            print_status "  zellij $current_zellij up to date"
+        fi
+    fi
+
+    # Yazi — check latest release vs installed
+    if command -v yazi >/dev/null 2>&1; then
+        local current_yazi latest_yazi
+        current_yazi=$(yazi --version 2>/dev/null | awk '{print $2}')
+        latest_yazi=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest 2>/dev/null | grep tag_name | cut -d'"' -f4)
+        local latest_yazi_clean="${latest_yazi#v}"
+        if [ -n "$latest_yazi" ] && [ "$current_yazi" != "$latest_yazi_clean" ]; then
+            print_status "  yazi: $current_yazi → $latest_yazi_clean"
+            curl -sL "https://github.com/sxyazi/yazi/releases/download/${latest_yazi}/yazi-x86_64-unknown-linux-gnu.zip" -o /tmp/yazi_upd.zip 2>/dev/null
+            if (cd /tmp && unzip -oq yazi_upd.zip && mv yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/ && mv yazi-x86_64-unknown-linux-gnu/ya /usr/local/bin/) 2>/dev/null; then
+                print_success "  yazi updated to $latest_yazi_clean"
+                bin_ok=$(( bin_ok + 1 ))
+            else
+                print_error "  yazi update failed"
+                bin_fail=$(( bin_fail + 1 ))
+            fi
+            rm -rf /tmp/yazi_upd.zip /tmp/yazi-x86_64-unknown-linux-gnu
+        else
+            print_status "  yazi $current_yazi up to date"
+        fi
+    fi
+
+    # Lazydocker — re-run installer script (it handles version check)
+    if command -v lazydocker >/dev/null 2>&1; then
+        print_status "  lazydocker: checking for updates..."
+        if curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash 2>/dev/null; then
+            [ -f "$HOME/.local/bin/lazydocker" ] && cp "$HOME/.local/bin/lazydocker" /usr/local/bin/ 2>/dev/null
+            print_success "  lazydocker checked"
+            bin_ok=$(( bin_ok + 1 ))
+        else
+            print_warning "  lazydocker update failed"
+            bin_fail=$(( bin_fail + 1 ))
+        fi
+    fi
+
+    # zjstatus (zellij plugin) — update for all users
+    local current_zjstatus_ver
+    if [ -f "$HOME/.config/zellij/plugins/zjstatus.wasm" ]; then
+        print_status "  zjstatus: downloading latest..."
+        if curl -sL https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm -o /tmp/zjstatus_new.wasm 2>/dev/null; then
+            for user_home in /root /home/*; do
+                if [ -d "$user_home/.config/zellij/plugins" ]; then
+                    cp /tmp/zjstatus_new.wasm "$user_home/.config/zellij/plugins/zjstatus.wasm" 2>/dev/null
+                    local owner
+                    owner=$(stat -c '%U' "$user_home" 2>/dev/null)
+                    [ -n "$owner" ] && chown "$owner:$owner" "$user_home/.config/zellij/plugins/zjstatus.wasm" 2>/dev/null
+                fi
+            done
+            rm -f /tmp/zjstatus_new.wasm
+            print_success "  zjstatus updated for all users"
+            bin_ok=$(( bin_ok + 1 ))
+        else
+            print_warning "  zjstatus download failed"
+            bin_fail=$(( bin_fail + 1 ))
+        fi
+    fi
+    echo ""
+
     print_status "Update summary:"
     echo "  apt:    $([ $apt_ok -eq 1 ] && echo 'upgraded' || echo 'failed')"
     echo "  github: $gh_updated updated, $gh_skipped up-to-date, $gh_fail failed"
     echo "  pip:    $([ $pip_ok -eq 1 ] && echo 'updated' || ([ -n "$pip_cmd" ] && echo 'failed' || echo 'not installed'))"
     echo "  cargo:  $([ $cargo_ok -eq 1 ] && echo 'updated' || (command -v cargo >/dev/null 2>&1 && echo 'failed' || echo 'not installed'))"
+    echo "  binary: $bin_ok updated, $bin_fail failed (zellij, yazi, lazydocker, zjstatus)"
     echo ""
 
     source "$PORTALGUN_LIB/sync_web.sh"
