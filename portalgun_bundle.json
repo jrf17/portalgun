@@ -48,7 +48,6 @@
       "cpp-14",
       "cpp-14-x86-64-linux-gnu",
       "criu",
-      "delta",
       "dex2jar",
       "dkms",
       "docker-buildx",
@@ -98,6 +97,7 @@
       "ghidra",
       "ghidra-data",
       "gir1.2-keybinder-3.0",
+      "git-delta",
       "gnuradio",
       "gnuradio-dev",
       "golang",
@@ -1012,6 +1012,7 @@
       "starship",
       "strace",
       "subfinder",
+      "tealdeer",
       "terminator",
       "terser",
       "tini-static",
@@ -1793,6 +1794,10 @@
       {
         "url": "https://github.com/zellij-org/zellij.git",
         "target": "/opt/tools/linux/shells"
+      },
+      {
+        "url": "https://github.com/jesseduffield/lazydocker.git",
+        "target": "/opt/tools/linux/misc"
       }
     ],
     "pip": [
@@ -2620,7 +2625,9 @@
       "zstandard==0.25.0"
     ],
     "cargo": [
-      "cargo-update"
+      "cargo-update",
+      "yazi-fm",
+      "yazi-cli"
     ]
   }
 }
