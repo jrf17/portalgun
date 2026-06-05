@@ -435,53 +435,28 @@ def install_config():
         # Copy config
         shutil.copy2(source, target)
 
-        # If tmux config, remove old theme plugins, run TPM install, then
-        # source the new config into all running tmux sessions so the change
-        # is visible immediately (otherwise the file changes but existing
-        # sessions keep using the old config until reload/restart).
+        # If tmux config, source it into any running tmux sessions so the
+        # change is visible immediately. Themes are standalone (no plugin
+        # download needed) so TPM headless install is not required.
         tpm_message = ''
         if config_type in ['tmux-theme', 'tmux-hotkeys', 'tmux-imported']:
-            # Remove all possible theme plugin folders to prevent conflicts
-            # catppuccin/tmux, dracula/tmux, nordtheme/tmux all use 'tmux'
-            # egel/tmux-gruvbox uses 'tmux-gruvbox'
-            # janoamaral/tokyo-night-tmux uses 'tokyo-night-tmux'
-            theme_plugin_dirs = [
-                os.path.join(HOME_DIR, '.tmux/plugins/tmux'),
-                os.path.join(HOME_DIR, '.tmux/plugins/tmux-gruvbox'),
-                os.path.join(HOME_DIR, '.tmux/plugins/tokyo-night-tmux')
-            ]
-            for theme_plugin_dir in theme_plugin_dirs:
-                if os.path.exists(theme_plugin_dir):
-                    shutil.rmtree(theme_plugin_dir)
-
-            tpm_path = os.path.join(HOME_DIR, '.tmux/plugins/tpm/bin/install_plugins')
-            if os.path.exists(tpm_path):
-                try:
-                    subprocess.run([tpm_path], capture_output=True, timeout=120)
-                    tpm_message = ' (theme installed'
-                except Exception:
-                    tpm_message = ' (run prefix+I to install theme'
-            else:
-                tpm_message = ' (TPM not installed'
-
-            # Re-source the config into any running tmux server (no-op if
-            # tmux isn't running). Each running session picks up the new
-            # bindings + colors immediately.
+            # Reload config in all running tmux sessions
             try:
-                r = subprocess.run(
-                    ['tmux', 'source-file', target],
-                    capture_output=True, timeout=10
-                )
-                if r.returncode == 0:
-                    tpm_message += ', live sessions reloaded)'
+                # Get list of tmux sessions
+                result = subprocess.run(['tmux', 'list-sessions', '-F', '#{session_name}'],
+                                       capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    sessions = result.stdout.strip().split('\n')
+                    for sess in sessions:
+                        subprocess.run(['tmux', 'source-file', '-t', sess, target],
+                                     capture_output=True, timeout=5)
+                    tpm_message = f' (reloaded in {len(sessions)} tmux session(s))'
                 else:
-                    # tmux not running, or other error
-                    tpm_message += ', no live tmux to reload)'
-            except FileNotFoundError:
-                tpm_message += ')'
+                    tpm_message = ' (will apply on next tmux start)'
             except Exception:
-                tpm_message += ', reload may need prefix+r)'
+                tpm_message = ' (will apply on next tmux start)'
 
+            # Skip the legacy TPM block below
         return jsonify({
             'success': True,
             'message': f'Installed to {target}{tpm_message}',
