@@ -2625,9 +2625,7 @@
       "zstandard==0.25.0"
     ],
     "cargo": [
-      "cargo-update",
-      "yazi-fm",
-      "yazi-cli"
+      "cargo-update"
     ]
   }
 }

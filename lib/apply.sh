@@ -380,6 +380,26 @@ apply_bundle() {
             tar xz -C /usr/local/bin/ 2>/dev/null && print_success "  zellij $ZELLIJ_VER installed" || print_warning "  zellij download failed"
     fi
 
+    # Install yazi binary (requires newer rustc than Kali ships)
+    if ! command -v yazi >/dev/null 2>&1; then
+        print_status "  Downloading yazi binary..."
+        local YAZI_VER
+        YAZI_VER=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | grep tag_name | cut -d'"' -f4 2>/dev/null)
+        if [ -n "$YAZI_VER" ]; then
+            curl -sL "https://github.com/sxyazi/yazi/releases/download/${YAZI_VER}/yazi-x86_64-unknown-linux-gnu.zip" -o /tmp/yazi.zip
+            (cd /tmp && unzip -oq yazi.zip && mv yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/ && mv yazi-x86_64-unknown-linux-gnu/ya /usr/local/bin/ 2>/dev/null) && \
+                print_success "  yazi $YAZI_VER installed" || print_warning "  yazi install failed"
+            rm -rf /tmp/yazi.zip /tmp/yazi-x86_64-unknown-linux-gnu
+        fi
+    fi
+
+    # Install lazydocker (binary release via official script)
+    if ! command -v lazydocker >/dev/null 2>&1; then
+        print_status "  Downloading lazydocker binary..."
+        curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash 2>/dev/null && \
+            print_success "  lazydocker installed" || print_warning "  lazydocker install failed"
+    fi
+
     if [ -d "$CONFIGS_DIR" ]; then
         for user in "${USERS_TO_CONFIGURE[@]}"; do
             _apply_dotfiles_for_user "$user" "$CONFIGS_DIR"
