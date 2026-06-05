@@ -371,32 +371,48 @@ apply_bundle() {
     local FIRST_USER="${SUDO_USER:-kali}"
     local USERS_TO_CONFIGURE=("root" "$FIRST_USER")
 
-    # Install cargo-binstall — fetches pre-built binaries instead of compiling
-    if ! command -v cargo-binstall >/dev/null 2>&1; then
-        _progress 96 "Phase 5: Installing cargo-binstall..."
-        print_status "  Installing cargo-binstall..."
-        curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash 2>/dev/null && \
-            print_success "  cargo-binstall installed" || print_warning "  cargo-binstall install failed"
-        # Make available system-wide
-        [ -f "$HOME/.cargo/bin/cargo-binstall" ] && cp "$HOME/.cargo/bin/cargo-binstall" /usr/local/bin/ 2>/dev/null || true
+    # Install Rust terminal tools via direct binary download (most reliable)
+    # cargo-binstall is unreliable in this environment, so download from GitHub releases directly
+
+    # Zellij
+    if ! command -v zellij >/dev/null 2>&1; then
+        _progress 96 "Phase 5: Installing zellij..."
+        local ZELLIJ_VER
+        ZELLIJ_VER=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | grep tag_name | cut -d'"' -f4 2>/dev/null || echo "v0.44.3")
+        if curl -sL "https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VER}/zellij-x86_64-unknown-linux-musl.tar.gz" | tar xz -C /usr/local/bin/ 2>/dev/null; then
+            print_success "  zellij $ZELLIJ_VER installed"
+        else
+            print_warning "  zellij download failed"
+        fi
     fi
 
-    # Install Rust tools via cargo-binstall (pre-built binaries, no compilation)
-    for tool in zellij yazi-fm yazi-cli lazydocker; do
-        local bin_name="$tool"
-        [ "$tool" = "yazi-fm" ] && bin_name="yazi"
-        [ "$tool" = "yazi-cli" ] && bin_name="ya"
-        if ! command -v "$bin_name" >/dev/null 2>&1; then
-            _progress 97 "Phase 5: Installing $tool..."
-            print_status "  cargo binstall $tool..."
-            if command -v cargo-binstall >/dev/null 2>&1; then
-                cargo binstall -y --no-confirm "$tool" 2>/dev/null && \
-                    print_success "  $tool installed" || print_warning "  $tool binstall failed"
-                # Symlink to /usr/local/bin
-                [ -f "$HOME/.cargo/bin/$bin_name" ] && cp "$HOME/.cargo/bin/$bin_name" /usr/local/bin/ 2>/dev/null || true
+    # Yazi + ya
+    if ! command -v yazi >/dev/null 2>&1; then
+        _progress 97 "Phase 5: Installing yazi..."
+        local YAZI_VER
+        YAZI_VER=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | grep tag_name | cut -d'"' -f4 2>/dev/null)
+        if [ -n "$YAZI_VER" ]; then
+            curl -sL "https://github.com/sxyazi/yazi/releases/download/${YAZI_VER}/yazi-x86_64-unknown-linux-gnu.zip" -o /tmp/yazi.zip 2>/dev/null
+            if (cd /tmp && unzip -oq yazi.zip && mv yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/ && mv yazi-x86_64-unknown-linux-gnu/ya /usr/local/bin/) 2>/dev/null; then
+                print_success "  yazi $YAZI_VER installed"
+            else
+                print_warning "  yazi install failed"
             fi
+            rm -rf /tmp/yazi.zip /tmp/yazi-x86_64-unknown-linux-gnu
         fi
-    done
+    fi
+
+    # Lazydocker
+    if ! command -v lazydocker >/dev/null 2>&1; then
+        _progress 98 "Phase 5: Installing lazydocker..."
+        if curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash 2>/dev/null; then
+            # The script installs to ~/.local/bin — copy to /usr/local/bin
+            [ -f "$HOME/.local/bin/lazydocker" ] && cp "$HOME/.local/bin/lazydocker" /usr/local/bin/ 2>/dev/null
+            command -v lazydocker >/dev/null 2>&1 && print_success "  lazydocker installed" || print_warning "  lazydocker not in PATH"
+        else
+            print_warning "  lazydocker download failed"
+        fi
+    fi
 
     if [ -d "$CONFIGS_DIR" ]; then
         for user in "${USERS_TO_CONFIGURE[@]}"; do
