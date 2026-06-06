@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kali Pentest Arsenal</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231e1e2e'/%3E%3Ctext x='32' y='44' font-family='monospace' font-size='40' font-weight='bold' text-anchor='middle' fill='%23cba6f7'%3E≫%3C/text%3E%3C/svg%3E">
     <style>
         :root {
             --bg: #0d1117;
@@ -2231,17 +2232,131 @@ async function loadInstalledTools() {
             div.dataset.desc = entry.desc.toLowerCase();
             div.dataset.type = entry.type;
             div.dataset.cat = 'installed';
+            const readmeBtn = t.readme_path
+                ? `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', '${t.readme_path}')" title="View README">📖</button>`
+                : '';
             div.innerHTML = `
                 <span class="tool-type ${typeClass}">${entry.type.toUpperCase()}</span>
                 <span class="tool-name">${entry.name}</span>
                 <span class="tool-path">${entry.path}</span>
                 <span class="tool-desc">${entry.desc}</span>
-                <span class="tool-tags">${entry.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')}</span>
+                <span class="tool-tags">${entry.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')} ${readmeBtn}</span>
             `;
             container.appendChild(div);
         });
         updateCount();
     } catch (e) { /* portalgun_tools.json not available */ }
+}
+
+async function showReadme(toolName, path) {
+    let modal = document.getElementById('readme-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'readme-modal';
+        modal.innerHTML = `
+            <div class="readme-overlay" onclick="closeReadme()"></div>
+            <div class="readme-content">
+                <div class="readme-header">
+                    <h3 id="readme-title"></h3>
+                    <button class="readme-close" onclick="closeReadme()">✕</button>
+                </div>
+                <div class="readme-body" id="readme-body">Loading...</div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const style = document.createElement('style');
+        style.textContent = `
+            #readme-modal { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; }
+            .readme-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.7); }
+            .readme-content { position:relative; background:#161b22; border:1px solid #30363d; border-radius:8px; width:90%; max-width:900px; max-height:85vh; display:flex; flex-direction:column; }
+            .readme-header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #30363d; }
+            .readme-header h3 { margin:0; color:#cba6f7; font-size:1.1em; }
+            .readme-close { background:none; border:none; color:#8b949e; font-size:1.5em; cursor:pointer; line-height:1; padding:0 5px; }
+            .readme-close:hover { color:#f85149; }
+            .readme-body { padding:20px 30px; overflow-y:auto; flex:1; color:#c9d1d9; line-height:1.6; font-size:0.9em; }
+            .readme-body pre { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px; overflow-x:auto; }
+            .readme-body code { background:#0d1117; padding:2px 6px; border-radius:3px; font-size:0.85em; color:#f5c2e7; }
+            .readme-body pre code { background:none; padding:0; color:#c9d1d9; }
+            .readme-body h1,.readme-body h2,.readme-body h3 { color:#cba6f7; margin-top:1.5em; }
+            .readme-body h1 { font-size:1.4em; border-bottom:1px solid #30363d; padding-bottom:0.3em; }
+            .readme-body h2 { font-size:1.2em; }
+            .readme-body a { color:#58a6ff; }
+            .readme-body table { border-collapse:collapse; margin:1em 0; }
+            .readme-body td,.readme-body th { border:1px solid #30363d; padding:6px 12px; }
+            .readme-body img { max-width:100%; }
+            .readme-body ul,.readme-body ol { padding-left:1.5em; }
+            .readme-body blockquote { border-left:3px solid #cba6f7; padding-left:1em; color:#8b949e; margin:1em 0; }
+            .readme-btn { background:transparent; border:1px solid #30363d; color:#cba6f7; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:0.85em; margin-left:6px; }
+            .readme-btn:hover { background:#cba6f7; color:#161b22; }
+        `;
+        document.head.appendChild(style);
+    }
+    document.getElementById('readme-title').textContent = toolName + ' — README';
+    document.getElementById('readme-body').innerHTML = 'Loading...';
+    modal.style.display = 'flex';
+    try {
+        const r = await fetch('/api/readme?path=' + encodeURIComponent(path));
+        if (!r.ok) {
+            document.getElementById('readme-body').innerHTML = '<em>README not available offline.</em>';
+            return;
+        }
+        const data = await r.json();
+        if (data.format === 'markdown') {
+            document.getElementById('readme-body').innerHTML = renderMarkdown(data.content);
+        } else {
+            const pre = document.createElement('pre');
+            pre.textContent = data.content;
+            const body = document.getElementById('readme-body');
+            body.innerHTML = '';
+            body.appendChild(pre);
+        }
+    } catch (e) {
+        document.getElementById('readme-body').innerHTML = '<em>Error: ' + e.message + '</em>';
+    }
+}
+
+function closeReadme() {
+    const m = document.getElementById('readme-modal');
+    if (m) m.style.display = 'none';
+}
+
+// Minimal markdown renderer — handles headings, code, lists, links, bold/italic
+function renderMarkdown(md) {
+    const escapeHtml = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const codeBlocks = [];
+    md = md.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+        codeBlocks.push(`<pre><code>${escapeHtml(code)}</code></pre>`);
+        return `§CODEBLOCK${codeBlocks.length - 1}§`;
+    });
+    md = escapeHtml(md);
+    md = md.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+           .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+           .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+           .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+           .replace(/\*(.+?)\*/g, '<em>$1</em>')
+           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+           .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+           .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+    const lines = md.split('\n');
+    let out = [], inList = false, listType = '';
+    for (const line of lines) {
+        const ul = line.match(/^[-*+] (.+)$/);
+        const ol = line.match(/^\d+\. (.+)$/);
+        if (ul) {
+            if (!inList || listType !== 'ul') { if (inList) out.push(`</${listType}>`); out.push('<ul>'); inList = true; listType = 'ul'; }
+            out.push(`<li>${ul[1]}</li>`);
+        } else if (ol) {
+            if (!inList || listType !== 'ol') { if (inList) out.push(`</${listType}>`); out.push('<ol>'); inList = true; listType = 'ol'; }
+            out.push(`<li>${ol[1]}</li>`);
+        } else {
+            if (inList) { out.push(`</${listType}>`); inList = false; }
+            if (line.trim()) out.push(line.match(/^<(h\d|blockquote|pre)/) ? line : `<p>${line}</p>`);
+        }
+    }
+    if (inList) out.push(`</${listType}>`);
+    let html = out.join('\n');
+    codeBlocks.forEach((cb, i) => { html = html.replace(`§CODEBLOCK${i}§`, cb); });
+    return html;
 }
 loadInstalledTools();
 </script>

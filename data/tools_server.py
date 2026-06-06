@@ -70,6 +70,29 @@ def index():
 def static_files(path):
     return send_from_directory(DOCS_DIR, path)
 
+@app.route('/api/readme')
+def serve_readme():
+    """Serve a tool's local README file (offline). Path must be under /opt/tools/."""
+    path = request.args.get('path', '')
+    if not path:
+        return 'No path specified', 400
+    # Security: only allow paths under /opt/tools/
+    real = os.path.realpath(path)
+    if not real.startswith('/opt/tools/'):
+        return 'Forbidden', 403
+    if not os.path.isfile(real):
+        return 'README not found', 404
+    try:
+        with open(real, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+        # If markdown, render minimal HTML; else serve as plain text
+        if real.lower().endswith(('.md', '.markdown')):
+            return jsonify({'content': content, 'format': 'markdown', 'path': real})
+        return jsonify({'content': content, 'format': 'text', 'path': real})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/install-dotfile', methods=['POST'])
 def install_dotfile():
     try:

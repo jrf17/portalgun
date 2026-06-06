@@ -9,6 +9,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def find_readme(tool_dir: str) -> str:
+    """Find a README file inside source/ — return absolute path."""
+    if not tool_dir:
+        return ""
+    src = Path(tool_dir) / "source"
+    if not src.is_dir():
+        return ""
+    candidates = ["README.md", "Readme.md", "readme.md", "README.MD",
+                  "README.rst", "README.txt", "README"]
+    for name in candidates:
+        p = src / name
+        if p.is_file():
+            return str(p)
+    for p in src.glob("[Rr][Ee][Aa][Dd][Mm][Ee]*"):
+        if p.is_file():
+            return str(p)
+    return ""
+
+
 def main(registry_dir: str, out_file: str) -> int:
     registry = Path(registry_dir)
     tools = {"apt": [], "github": []}
@@ -19,7 +38,12 @@ def main(registry_dir: str, out_file: str) -> int:
             continue
         for f in sorted(type_dir.glob("*.json")):
             try:
-                tools[kind].append(json.loads(f.read_text()))
+                entry = json.loads(f.read_text())
+                if kind == "github":
+                    readme_path = find_readme(entry.get("tool_dir", ""))
+                    if readme_path:
+                        entry["readme_path"] = readme_path
+                tools[kind].append(entry)
             except Exception as e:
                 print(f"warn: could not parse {f}: {e}", file=sys.stderr)
 
