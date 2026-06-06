@@ -77,8 +77,9 @@ def serve_readme():
     if not path:
         return 'No path specified', 400
     real = os.path.realpath(path)
-    # Allow paths under /opt/tools/ (github tools) or /usr/share/doc/ (apt READMEs)
-    allowed_prefixes = ('/opt/tools/', '/usr/share/doc/')
+    # Allow paths under /opt/tools/ (github), /usr/share/doc/ (apt fallback),
+    # or /var/cache/portalgun/apt-readmes/ (cached GitHub READMEs for apt tools)
+    allowed_prefixes = ('/opt/tools/', '/usr/share/doc/', '/var/cache/portalgun/')
     if not any(real.startswith(p) for p in allowed_prefixes):
         return 'Forbidden', 403
     if not os.path.isfile(real):

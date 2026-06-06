@@ -1369,6 +1369,27 @@ const toolsData = [
 ];
 
 // Render
+// Lookup: tool path → README/homepage info from registry
+window._readmeIndex = { byPath: {}, byPackage: {} };
+
+function readmeButtonFor(tool) {
+    // Try lookup by path (works for static tools that match installed tool_dir)
+    let info = null, repoUrl = null;
+    if (tool.path) {
+        const norm = tool.path.replace(/\/+$/, '');
+        info = window._readmeIndex.byPath[norm] || window._readmeIndex.byPath[norm + '/'];
+        if (info) repoUrl = info.url || '';
+    }
+    // For apt static tools, try by package name
+    if (!info && tool.type === 'apt') {
+        info = window._readmeIndex.byPackage[tool.path] || window._readmeIndex.byPackage[tool.name.toLowerCase()];
+        if (info) repoUrl = info.homepage || '';
+    }
+    if (!info) return '';
+    const repoArg = repoUrl ? `, '${repoUrl.replace(/'/g, "\\'")}'` : '';
+    return `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${tool.name.replace(/'/g, "\\'")}', {kind:'file', path:'${info.readme_path}'}${repoArg})" title="View README">📖</button>`;
+}
+
 function renderTools() {
     document.querySelectorAll('.category').forEach(cat => {
         const catName = cat.dataset.cat;
@@ -1387,13 +1408,14 @@ function renderTools() {
             div.dataset.cat = tool.cat;
 
             const typeClass = {github:'github',apt:'apt',pip:'pip',pipx:'pipx',gem:'gem',lib:'lib'}[tool.type] || '';
+            const rmBtn = readmeButtonFor(tool);
 
             div.innerHTML = `
                 <span class="tool-type ${typeClass}">${tool.type.toUpperCase()}</span>
                 <span class="tool-name">${tool.name}</span>
                 <span class="tool-path">${tool.path}</span>
                 <span class="tool-desc">${tool.desc}</span>
-                <span class="tool-tags">${tool.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')}</span>
+                <span class="tool-tags">${tool.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')} ${rmBtn}</span>
             `;
             container.appendChild(div);
         });
@@ -2207,6 +2229,27 @@ async function loadInstalledTools() {
         if (!r.ok) return;
         const data = await r.json();
         const all = [...(data.tools.apt || []), ...(data.tools.github || [])];
+
+        // Build path/package index for static tools to look up READMEs
+        for (const t of (data.tools.github || [])) {
+            if (t.readme_path && t.tool_dir) {
+                window._readmeIndex.byPath[t.tool_dir.replace(/\/+$/, '')] = {
+                    readme_path: t.readme_path,
+                    url: t.url || ''
+                };
+            }
+        }
+        for (const t of (data.tools.apt || [])) {
+            if (t.readme && t.readme.path) {
+                window._readmeIndex.byPackage[t.package] = {
+                    readme_path: t.readme.path,
+                    homepage: t.homepage || ''
+                };
+            }
+        }
+        // Re-render static tools so they pick up the README buttons
+        renderTools();
+
         if (!all.length) return;
 
         const container = document.querySelector('.category[data-cat="installed"] .tools');
@@ -2234,16 +2277,11 @@ async function loadInstalledTools() {
             div.dataset.cat = 'installed';
             let readmeBtn = '';
             if (t.type === 'github' && t.readme_path) {
-                readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'file', path:'${t.readme_path}'})" title="View README">📖</button>`;
-            } else if (t.type === 'apt' && t.readme) {
-                const r = t.readme;
-                if (r.kind === 'doc-file') {
-                    readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'file', path:'${r.path}'})" title="View README">📖</button>`;
-                } else if (r.kind === 'manpage') {
-                    readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'manpage', package:'${r.package}'})" title="View man page">📖</button>`;
-                } else if (r.kind === 'help-text') {
-                    readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'help', package:'${r.package}'})" title="View --help">📖</button>`;
-                }
+                const src = t.url ? `, '${t.url}'` : '';
+                readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'file', path:'${t.readme_path}'}${src})" title="View README">📖</button>`;
+            } else if (t.type === 'apt' && t.readme && t.readme.kind === 'doc-file') {
+                const src = t.homepage ? `, '${t.homepage}'` : '';
+                readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'file', path:'${t.readme.path}'}${src})" title="View README">📖</button>`;
             }
             div.innerHTML = `
                 <span class="tool-type ${typeClass}">${entry.type.toUpperCase()}</span>
@@ -2258,9 +2296,9 @@ async function loadInstalledTools() {
     } catch (e) { /* portalgun_tools.json not available */ }
 }
 
-async function showReadme(toolName, source) {
-    // Backward compat: if source is a string, treat as a file path
+async function showReadme(toolName, source, repoUrl) {
     if (typeof source === 'string') source = { kind: 'file', path: source };
+    window._currentRepoUrl = repoUrl || '';
     let modal = document.getElementById('readme-modal');
     if (!modal) {
         modal = document.createElement('div');
@@ -2270,7 +2308,10 @@ async function showReadme(toolName, source) {
             <div class="readme-content">
                 <div class="readme-header">
                     <h3 id="readme-title"></h3>
-                    <button class="readme-close" onclick="closeReadme()">✕</button>
+                    <div class="readme-header-actions">
+                        <a id="readme-github-link" class="readme-github-link" href="#" target="_blank" style="display:none;">↗ View on GitHub</a>
+                        <button class="readme-close" onclick="closeReadme()">✕</button>
+                    </div>
                 </div>
                 <div class="readme-body" id="readme-body">Loading...</div>
             </div>
@@ -2279,40 +2320,52 @@ async function showReadme(toolName, source) {
         const style = document.createElement('style');
         style.textContent = `
             #readme-modal { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; }
-            .readme-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.7); }
-            .readme-content { position:relative; background:#161b22; border:1px solid #30363d; border-radius:8px; width:90%; max-width:900px; max-height:85vh; display:flex; flex-direction:column; }
-            .readme-header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #30363d; }
-            .readme-header h3 { margin:0; color:#cba6f7; font-size:1.1em; }
-            .readme-close { background:none; border:none; color:#8b949e; font-size:1.5em; cursor:pointer; line-height:1; padding:0 5px; }
+            .readme-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.8); }
+            .readme-content { position:relative; background:#161b22; border:1px solid #30363d; border-radius:10px; width:95vw; max-width:1400px; height:92vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+            .readme-header { display:flex; justify-content:space-between; align-items:center; padding:18px 28px; border-bottom:1px solid #30363d; gap:12px; }
+            .readme-header h3 { margin:0; color:#cba6f7; font-size:1.4em; flex:1; }
+            .readme-header-actions { display:flex; gap:10px; align-items:center; }
+            .readme-github-link { background:#21262d; color:#cba6f7; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.9em; border:1px solid #30363d; }
+            .readme-github-link:hover { background:#cba6f7; color:#161b22; }
+            .readme-close { background:none; border:none; color:#8b949e; font-size:2em; cursor:pointer; line-height:1; padding:0 8px; }
             .readme-close:hover { color:#f85149; }
-            .readme-body { padding:20px 30px; overflow-y:auto; flex:1; color:#c9d1d9; line-height:1.6; font-size:0.9em; }
-            .readme-body pre { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px; overflow-x:auto; }
-            .readme-body code { background:#0d1117; padding:2px 6px; border-radius:3px; font-size:0.85em; color:#f5c2e7; }
+            .readme-body { padding:30px 50px; overflow-y:auto; flex:1; color:#c9d1d9; line-height:1.7; font-size:1.1em; max-width:none; }
+            .readme-body pre { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:16px; overflow-x:auto; font-size:0.95em; }
+            .readme-body code { background:#0d1117; padding:3px 8px; border-radius:4px; font-size:0.92em; color:#f5c2e7; }
             .readme-body pre code { background:none; padding:0; color:#c9d1d9; }
-            .readme-body h1,.readme-body h2,.readme-body h3 { color:#cba6f7; margin-top:1.5em; }
-            .readme-body h1 { font-size:1.4em; border-bottom:1px solid #30363d; padding-bottom:0.3em; }
-            .readme-body h2 { font-size:1.2em; }
+            .readme-body h1,.readme-body h2,.readme-body h3,.readme-body h4 { color:#cba6f7; margin-top:1.8em; margin-bottom:0.6em; }
+            .readme-body h1 { font-size:2em; border-bottom:1px solid #30363d; padding-bottom:0.4em; }
+            .readme-body h2 { font-size:1.6em; border-bottom:1px solid #21262d; padding-bottom:0.3em; }
+            .readme-body h3 { font-size:1.35em; }
+            .readme-body h4 { font-size:1.15em; }
             .readme-body a { color:#58a6ff; }
-            .readme-body table { border-collapse:collapse; margin:1em 0; }
-            .readme-body td,.readme-body th { border:1px solid #30363d; padding:6px 12px; }
-            .readme-body img { max-width:100%; }
-            .readme-body ul,.readme-body ol { padding-left:1.5em; }
-            .readme-body blockquote { border-left:3px solid #cba6f7; padding-left:1em; color:#8b949e; margin:1em 0; }
+            .readme-body a:hover { text-decoration:underline; }
+            .readme-body table { border-collapse:collapse; margin:1.2em 0; }
+            .readme-body td,.readme-body th { border:1px solid #30363d; padding:8px 14px; }
+            .readme-body th { background:#21262d; color:#cba6f7; }
+            .readme-body img { max-width:100%; border-radius:4px; margin:0.6em 0; background:#fff1; padding:4px; }
+            .readme-body img[alt*="badge" i], .readme-body img[src*="badge" i], .readme-body img[src*="shields.io" i] { background:none; padding:0; display:inline-block; vertical-align:middle; }
+            .readme-body ul,.readme-body ol { padding-left:1.8em; margin:1em 0; }
+            .readme-body li { margin:0.3em 0; }
+            .readme-body blockquote { border-left:4px solid #cba6f7; padding:0.4em 1.2em; color:#8b949e; margin:1.2em 0; background:#0d1117; border-radius:0 4px 4px 0; }
+            .readme-body hr { border:none; border-top:1px solid #30363d; margin:2em 0; }
+            .readme-body p { margin:1em 0; }
             .readme-btn { background:transparent; border:1px solid #30363d; color:#cba6f7; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:0.85em; margin-left:6px; }
             .readme-btn:hover { background:#cba6f7; color:#161b22; }
         `;
         document.head.appendChild(style);
     }
-    const titleSuffix = source.kind === 'manpage' ? ' — Man Page'
-                      : source.kind === 'help' ? ' — Help'
-                      : ' — README';
-    document.getElementById('readme-title').textContent = toolName + titleSuffix;
+    document.getElementById('readme-title').textContent = toolName + ' — README';
     document.getElementById('readme-body').innerHTML = 'Loading...';
+    const ghLink = document.getElementById('readme-github-link');
+    if (window._currentRepoUrl) {
+        ghLink.href = window._currentRepoUrl;
+        ghLink.style.display = 'inline-block';
+    } else {
+        ghLink.style.display = 'none';
+    }
     modal.style.display = 'flex';
-    let url;
-    if (source.kind === 'manpage') url = '/api/readme/manpage?package=' + encodeURIComponent(source.package);
-    else if (source.kind === 'help') url = '/api/readme/help?package=' + encodeURIComponent(source.package);
-    else url = '/api/readme?path=' + encodeURIComponent(source.path);
+    const url = '/api/readme?path=' + encodeURIComponent(source.path);
     try {
         const r = await fetch(url);
         if (!r.ok) {
@@ -2339,23 +2392,66 @@ function closeReadme() {
     if (m) m.style.display = 'none';
 }
 
-// Minimal markdown renderer — handles headings, code, lists, links, bold/italic
+function resolveAssetUrl(src) {
+    // Already absolute
+    if (/^https?:\/\//i.test(src)) return src;
+    if (src.startsWith('//')) return 'https:' + src;
+    // Need a repo URL to resolve relative
+    const repo = window._currentRepoUrl || '';
+    const m = repo.match(/github\.com\/([^/?#]+)\/([^/?#]+)/i);
+    if (!m) return src;
+    const owner = m[1];
+    const repoName = m[2].replace(/\.git$/, '');
+    const path = src.replace(/^\.?\//, '');
+    return `https://raw.githubusercontent.com/${owner}/${repoName}/HEAD/${path}`;
+}
+
+// Markdown renderer — handles headings, code, images, lists, links, tables
 function renderMarkdown(md) {
     const escapeHtml = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    // Extract code blocks first
     const codeBlocks = [];
     md = md.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
         codeBlocks.push(`<pre><code>${escapeHtml(code)}</code></pre>`);
-        return `§CODEBLOCK${codeBlocks.length - 1}§`;
+        return `§§CODEBLOCK${codeBlocks.length - 1}§§`;
     });
+    // Extract HTML img tags (often used in READMEs for badges/logos) so escapeHtml doesn't eat them
+    const htmlImgs = [];
+    md = md.replace(/<img\s+[^>]*\/?>/gi, m => {
+        // Resolve src
+        m = m.replace(/src="([^"]+)"/i, (_, src) => `src="${resolveAssetUrl(src)}"`);
+        m = m.replace(/src='([^']+)'/i, (_, src) => `src='${resolveAssetUrl(src)}'`);
+        htmlImgs.push(m);
+        return `§§IMG${htmlImgs.length - 1}§§`;
+    });
+    // Extract HTML anchor tags too
+    const htmlAnchors = [];
+    md = md.replace(/<a\s+[^>]*>[\s\S]*?<\/a>/gi, m => {
+        htmlAnchors.push(m);
+        return `§§A${htmlAnchors.length - 1}§§`;
+    });
+
     md = escapeHtml(md);
-    md = md.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+
+    // Headings
+    md = md.replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+           .replace(/^### (.+)$/gm, '<h3>$1</h3>')
            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-           .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-           .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-           .replace(/\*(.+?)\*/g, '<em>$1</em>')
+           .replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    // Images: ![alt](src)
+    md = md.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
+        return `<img src="${resolveAssetUrl(src)}" alt="${alt}">`;
+    });
+    // Links: [text](url)
+    md = md.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // Inline formatting
+    md = md.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+           .replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>')
            .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-           .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+           .replace(/^---+$/gm, '<hr>')
            .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // Lists and paragraphs
     const lines = md.split('\n');
     let out = [], inList = false, listType = '';
     for (const line of lines) {
@@ -2369,12 +2465,18 @@ function renderMarkdown(md) {
             out.push(`<li>${ol[1]}</li>`);
         } else {
             if (inList) { out.push(`</${listType}>`); inList = false; }
-            if (line.trim()) out.push(line.match(/^<(h\d|blockquote|pre)/) ? line : `<p>${line}</p>`);
+            if (line.trim()) {
+                out.push(line.match(/^<(h\d|blockquote|pre|hr|img|a\s)/) ? line : `<p>${line}</p>`);
+            }
         }
     }
     if (inList) out.push(`</${listType}>`);
     let html = out.join('\n');
-    codeBlocks.forEach((cb, i) => { html = html.replace(`§CODEBLOCK${i}§`, cb); });
+
+    // Restore extracted blocks
+    codeBlocks.forEach((cb, i) => { html = html.replace(`§§CODEBLOCK${i}§§`, cb); });
+    htmlImgs.forEach((img, i) => { html = html.replace(`§§IMG${i}§§`, img); });
+    htmlAnchors.forEach((a, i) => { html = html.replace(`§§A${i}§§`, a); });
     return html;
 }
 loadInstalledTools();
