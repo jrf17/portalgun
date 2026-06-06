@@ -2232,9 +2232,19 @@ async function loadInstalledTools() {
             div.dataset.desc = entry.desc.toLowerCase();
             div.dataset.type = entry.type;
             div.dataset.cat = 'installed';
-            const readmeBtn = t.readme_path
-                ? `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', '${t.readme_path}')" title="View README">📖</button>`
-                : '';
+            let readmeBtn = '';
+            if (t.type === 'github' && t.readme_path) {
+                readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'file', path:'${t.readme_path}'})" title="View README">📖</button>`;
+            } else if (t.type === 'apt' && t.readme) {
+                const r = t.readme;
+                if (r.kind === 'doc-file') {
+                    readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'file', path:'${r.path}'})" title="View README">📖</button>`;
+                } else if (r.kind === 'manpage') {
+                    readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'manpage', package:'${r.package}'})" title="View man page">📖</button>`;
+                } else if (r.kind === 'help-text') {
+                    readmeBtn = `<button class="readme-btn" onclick="event.stopPropagation();showReadme('${entry.name}', {kind:'help', package:'${r.package}'})" title="View --help">📖</button>`;
+                }
+            }
             div.innerHTML = `
                 <span class="tool-type ${typeClass}">${entry.type.toUpperCase()}</span>
                 <span class="tool-name">${entry.name}</span>
@@ -2248,7 +2258,9 @@ async function loadInstalledTools() {
     } catch (e) { /* portalgun_tools.json not available */ }
 }
 
-async function showReadme(toolName, path) {
+async function showReadme(toolName, source) {
+    // Backward compat: if source is a string, treat as a file path
+    if (typeof source === 'string') source = { kind: 'file', path: source };
     let modal = document.getElementById('readme-modal');
     if (!modal) {
         modal = document.createElement('div');
@@ -2291,11 +2303,18 @@ async function showReadme(toolName, path) {
         `;
         document.head.appendChild(style);
     }
-    document.getElementById('readme-title').textContent = toolName + ' — README';
+    const titleSuffix = source.kind === 'manpage' ? ' — Man Page'
+                      : source.kind === 'help' ? ' — Help'
+                      : ' — README';
+    document.getElementById('readme-title').textContent = toolName + titleSuffix;
     document.getElementById('readme-body').innerHTML = 'Loading...';
     modal.style.display = 'flex';
+    let url;
+    if (source.kind === 'manpage') url = '/api/readme/manpage?package=' + encodeURIComponent(source.package);
+    else if (source.kind === 'help') url = '/api/readme/help?package=' + encodeURIComponent(source.package);
+    else url = '/api/readme?path=' + encodeURIComponent(source.path);
     try {
-        const r = await fetch('/api/readme?path=' + encodeURIComponent(path));
+        const r = await fetch(url);
         if (!r.ok) {
             document.getElementById('readme-body').innerHTML = '<em>README not available offline.</em>';
             return;

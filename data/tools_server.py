@@ -72,25 +72,79 @@ def static_files(path):
 
 @app.route('/api/readme')
 def serve_readme():
-    """Serve a tool's local README file (offline). Path must be under /opt/tools/."""
+    """Serve a tool's local README file (offline)."""
     path = request.args.get('path', '')
     if not path:
         return 'No path specified', 400
-    # Security: only allow paths under /opt/tools/
     real = os.path.realpath(path)
-    if not real.startswith('/opt/tools/'):
+    # Allow paths under /opt/tools/ (github tools) or /usr/share/doc/ (apt READMEs)
+    allowed_prefixes = ('/opt/tools/', '/usr/share/doc/')
+    if not any(real.startswith(p) for p in allowed_prefixes):
         return 'Forbidden', 403
     if not os.path.isfile(real):
         return 'README not found', 404
     try:
-        with open(real, 'r', encoding='utf-8', errors='replace') as f:
-            content = f.read()
-        # If markdown, render minimal HTML; else serve as plain text
-        if real.lower().endswith(('.md', '.markdown')):
-            return jsonify({'content': content, 'format': 'markdown', 'path': real})
-        return jsonify({'content': content, 'format': 'text', 'path': real})
+        if real.endswith('.gz'):
+            import gzip
+            with gzip.open(real, 'rt', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        else:
+            with open(real, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        fmt = 'markdown' if real.lower().rstrip('.gz').endswith(('.md', '.markdown')) else 'text'
+        return jsonify({'content': content, 'format': fmt, 'path': real})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+_SAFE_PKG_NAME = re.compile(r'^[a-z0-9][a-z0-9+._-]*$')
+
+
+@app.route('/api/readme/manpage')
+def serve_manpage():
+    """Render an apt package's man page as text."""
+    package = request.args.get('package', '')
+    if not _SAFE_PKG_NAME.match(package):
+        return jsonify({'error': 'Invalid package name'}), 400
+    try:
+        env = os.environ.copy()
+        env['MANWIDTH'] = '100'
+        env['MANPAGER'] = 'cat'
+        result = subprocess.run(
+            ['man', package],
+            capture_output=True, text=True, timeout=10,
+            env=env
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Strip backspace formatting (man uses _\b_ for underline, etc.)
+            content = re.sub(r'.\x08', '', result.stdout)
+            return jsonify({'content': content, 'format': 'text', 'path': f'man {package}'})
+        return jsonify({'error': 'No man page for ' + package}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/readme/help')
+def serve_help_text():
+    """Run <package> --help for tools without a README or man page."""
+    package = request.args.get('package', '')
+    if not _SAFE_PKG_NAME.match(package):
+        return jsonify({'error': 'Invalid package name'}), 400
+    # Try `<bin> --help` then `<bin> -h`
+    for flag in ('--help', '-h'):
+        try:
+            result = subprocess.run(
+                [package, flag],
+                capture_output=True, text=True, timeout=5
+            )
+            text = (result.stdout or '') + (result.stderr or '')
+            if text.strip():
+                return jsonify({'content': text, 'format': 'text', 'path': f'{package} {flag}'})
+        except FileNotFoundError:
+            return jsonify({'error': 'Binary not in PATH: ' + package}), 404
+        except Exception:
+            continue
+    return jsonify({'error': 'No help output for ' + package}), 404
 
 
 @app.route('/api/install-dotfile', methods=['POST'])
