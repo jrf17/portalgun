@@ -434,6 +434,7 @@
     <a class="sub" href="#admin-export">Export Bundle</a>
     <a class="sub" href="#admin-phases">Phase Selector</a>
     <a class="sub" href="#admin-individual">Individual Installs</a>
+    <a class="sub" href="#admin-examples">Worked Examples</a>
     <a class="sub" href="#admin-progress">Progress &amp; Output</a>
     <a href="#webui-dotfiles">Dotfile Manager</a>
   </div>
@@ -935,6 +936,277 @@
       .ui-output-pre .ok  { color: var(--green); }
       .ui-output-pre .dim { color: var(--subtext0); }
     </style>
+  </section>
+
+  <section class="section" id="admin-examples">
+    <h4>Worked Install Examples</h4>
+    <p>
+      Each install type takes a different shape of input, hits a different backend, and emits a
+      slightly different stream of progress markers. Below are filled-in examples for all four
+      phases using common hacking tools so you can see exactly what to type into the form and
+      what to expect in the streaming output window.
+    </p>
+
+    <!-- APT example -->
+    <h5 style="margin-top:1.4rem;color:var(--blue);">APT — <code>nmap</code></h5>
+    <p>
+      APT installs a single Debian package via <code>apt-get install -y</code>. Use this for
+      anything in the Kali repos. The package name must match the Debian package exactly
+      (run <code>apt-cache search &lt;keyword&gt;</code> if you are unsure). No URL, no target,
+      no build step — apt resolves dependencies and stages binaries into <code>/usr/bin</code>.
+    </p>
+    <div class="ui-mockup">
+      <div class="ui-modal-header">
+        <span class="ui-title">Admin Console — APT install</span>
+      </div>
+      <div class="ui-tabs">
+        <button class="ui-tab ui-tab-active">APT</button>
+        <button class="ui-tab">GitHub</button>
+        <button class="ui-tab">pip</button>
+        <button class="ui-tab">cargo</button>
+      </div>
+      <div class="ui-tab-content">
+        <div class="ui-form-label">Installs via <code>portalgun install apt</code> — registered in registry, synced to rebuild scripts.</div>
+        <div class="ui-form-row">
+          <div class="ui-form-field">
+            <div class="ui-form-label-sm">Package name</div>
+            <input type="text" value="nmap" class="ui-input" disabled>
+          </div>
+          <button class="ui-btn ui-btn-install-sm">Install</button>
+        </div>
+      </div>
+      <div class="ui-output-section">
+        <div class="ui-output-header"><span>Output</span></div>
+        <pre class="ui-output-pre"><span class="ok">[*] portalgun install apt nmap</span>
+<span class="dim">[*] Resolving package metadata...</span>
+<span class="ok">[apt] nmap (7.94+dfsg-3+b1) — selected</span>
+<span class="dim">[apt] Reading package lists... Done</span>
+<span class="dim">[apt] Building dependency tree... Done</span>
+<span class="dim">[apt] The following NEW packages will be installed: nmap libblas3 liblua5.4-0</span>
+<span class="dim">[apt] Need to get 5,883 kB of archives.</span>
+<span class="ok">[apt] Get:1 http://kali.download/kali kali-rolling/main amd64 nmap amd64 7.94 [4,950 kB]</span>
+<span class="ok">[apt] Fetched 5,883 kB in 2s (2,937 kB/s)</span>
+<span class="ok">[apt] Setting up nmap (7.94+dfsg-3+b1) ...</span>
+<span class="ok">[+] Registered → /var/lib/portalgun/registry/apt/nmap.json</span>
+<span class="ok">[+] Updated web manifest → /opt/tools-docs/portalgun_tools.json</span>
+<span class="ok">[+] Status: ok  (took 3.4s)</span></pre>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--subtext0);">
+      <strong>What gets written:</strong>
+      <code>/var/lib/portalgun/registry/apt/nmap.json</code> records the package, version, and
+      install timestamp. <code>installable_packages.txt</code> in your bundle dir gets a new line
+      so <code>portalgun export</code> persists it.
+    </p>
+
+    <!-- GitHub example -->
+    <h5 style="margin-top:1.6rem;color:var(--purple);">GitHub — <code>BloodHoundAD/BloodHound.py</code></h5>
+    <p>
+      GitHub installs clone a repo into a category folder under <code>/opt/tools/</code>,
+      auto-detect the build system (Make / pip-req / cargo / setup.py / Dockerfile), build it,
+      and symlink any executables into <code>/usr/local/bin</code>. The URL must be the full
+      <code>.git</code> URL. The target dir tells portalgun which category to place the tool in
+      and drives where it appears in the web UI.
+    </p>
+    <div class="ui-mockup">
+      <div class="ui-modal-header">
+        <span class="ui-title">Admin Console — GitHub install</span>
+      </div>
+      <div class="ui-tabs">
+        <button class="ui-tab">APT</button>
+        <button class="ui-tab ui-tab-active">GitHub</button>
+        <button class="ui-tab">pip</button>
+        <button class="ui-tab">cargo</button>
+      </div>
+      <div class="ui-tab-content">
+        <div class="ui-form-label">Installs via <code>portalgun install github</code> — auto-detects build system, registers, syncs.</div>
+        <div class="ui-form-row" style="flex-wrap:wrap;gap:0.6rem;">
+          <div class="ui-form-field" style="flex:2 1 320px;">
+            <div class="ui-form-label-sm">Repository URL</div>
+            <input type="text" value="https://github.com/BloodHoundAD/BloodHound.py.git" class="ui-input" disabled>
+          </div>
+          <div class="ui-form-field" style="flex:1 1 220px;">
+            <div class="ui-form-label-sm">Target dir (category)</div>
+            <input type="text" value="/opt/tools/windows/ad" class="ui-input" disabled>
+          </div>
+          <button class="ui-btn ui-btn-install-sm">Install</button>
+        </div>
+        <div style="margin-top:0.5rem;font-size:0.7rem;color:var(--subtext0);">
+          Target: <code style="color:var(--blue);">/opt/tools/windows/ad/bloodhound.py</code>
+        </div>
+      </div>
+      <div class="ui-output-section">
+        <div class="ui-output-header"><span>Output</span></div>
+        <pre class="ui-output-pre"><span class="ok">[*] portalgun install github https://github.com/BloodHoundAD/BloodHound.py.git /opt/tools/windows/ad</span>
+<span class="ok">[git] Cloning into '/opt/tools/windows/ad/bloodhound.py/source'...</span>
+<span class="dim">[git] remote: Counting objects: 3,142, done.</span>
+<span class="dim">[git] remote: Total 3,142 (delta 0), reused 0 (delta 0)</span>
+<span class="ok">[git] HEAD at 39d1a48 (master)</span>
+<span class="dim">[build] Detected setup.py + requirements.txt → pip install -r</span>
+<span class="ok">[build] /opt/pentest-venv/bin/pip install --quiet -r requirements.txt</span>
+<span class="ok">[build]   Successfully installed dnspython-2.4.2 impacket-0.11.0 ldap3-2.9.1</span>
+<span class="ok">[*]   symlinked → /usr/local/bin/bloodhound-python</span>
+<span class="ok">[+] Registered → /var/lib/portalgun/registry/github/bloodhoundad_bloodhound_py_.json</span>
+<span class="ok">[+] Appended tool entry → installers/install_github_tools.sh</span>
+<span class="ok">[+] Updated web manifest → /opt/tools-docs/portalgun_tools.json</span>
+<span class="ok">[+] Status: ok  (took 18.2s)</span></pre>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--subtext0);">
+      <strong>Target path anatomy:</strong> <code>/opt/tools/&lt;os&gt;/&lt;category&gt;</code>.
+      The OS segment drives which top-level tab the tool surfaces under (Windows, Linux, Cloud,
+      Web, …). The category segment is the section heading inside that tab.
+      <strong>Common categories:</strong> <code>windows/ad</code>, <code>windows/credentials</code>,
+      <code>windows/privesc</code>, <code>linux/privesc</code>, <code>cloud/aws</code>,
+      <code>cloud/multi</code>, <code>web/scanners</code>, <code>enumeration/recon</code>.
+    </p>
+
+    <!-- pip example -->
+    <h5 style="margin-top:1.6rem;color:var(--yellow);">pip — <code>impacket</code></h5>
+    <p>
+      pip installs a Python package into the shared <code>/opt/pentest-venv</code> so the binary
+      shims work for every user. Accepts a bare package name (latest from PyPI), a pinned spec
+      (<code>impacket==0.11.0</code>), or a Git URL
+      (<code>git+https://github.com/&hellip;</code>) for pre-release builds.
+    </p>
+    <div class="ui-mockup">
+      <div class="ui-modal-header">
+        <span class="ui-title">Admin Console — pip install</span>
+      </div>
+      <div class="ui-tabs">
+        <button class="ui-tab">APT</button>
+        <button class="ui-tab">GitHub</button>
+        <button class="ui-tab ui-tab-active">pip</button>
+        <button class="ui-tab">cargo</button>
+      </div>
+      <div class="ui-tab-content">
+        <div class="ui-form-label">Installs into <code>/opt/pentest-venv</code> — accessible system-wide via PATH shims.</div>
+        <div class="ui-form-row">
+          <div class="ui-form-field">
+            <div class="ui-form-label-sm">Package spec (or <code>git+URL</code>)</div>
+            <input type="text" value="impacket" class="ui-input" disabled>
+          </div>
+          <button class="ui-btn ui-btn-install-sm">Install</button>
+        </div>
+      </div>
+      <div class="ui-output-section">
+        <div class="ui-output-header"><span>Output</span></div>
+        <pre class="ui-output-pre"><span class="ok">[*] portalgun install pip impacket</span>
+<span class="dim">[pip] /opt/pentest-venv/bin/pip install --upgrade impacket</span>
+<span class="dim">[pip] Collecting impacket</span>
+<span class="dim">[pip]   Downloading impacket-0.11.0.tar.gz (1.4 MB)</span>
+<span class="dim">[pip] Collecting pyasn1-modules (from impacket)</span>
+<span class="dim">[pip] Collecting cryptography>=2.5 (from impacket)</span>
+<span class="dim">[pip] Building wheels for collected packages: impacket</span>
+<span class="ok">[pip] Successfully built impacket</span>
+<span class="ok">[pip] Installing collected packages: impacket</span>
+<span class="ok">[pip] Successfully installed impacket-0.11.0</span>
+<span class="dim">[pip] Symlinking entry points...</span>
+<span class="ok">[pip]   /opt/pentest-venv/bin/secretsdump.py → /usr/local/bin/</span>
+<span class="ok">[pip]   /opt/pentest-venv/bin/GetUserSPNs.py → /usr/local/bin/</span>
+<span class="ok">[pip]   /opt/pentest-venv/bin/ntlmrelayx.py → /usr/local/bin/</span>
+<span class="ok">[+] Registered → /var/lib/portalgun/registry/pip/impacket.json</span>
+<span class="ok">[+] Status: ok  (took 14.7s)</span></pre>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--subtext0);">
+      <strong>Why a shared venv:</strong> avoids polluting system Python (PEP-668 protections on
+      modern Debian block <code>pip install</code> at the OS level) and prevents apt and pip from
+      fighting over the same site-packages. The <code>installable_pip.txt</code> file lists every
+      pinned spec so re-applying a bundle reproduces the exact same versions.
+    </p>
+
+    <!-- cargo example -->
+    <h5 style="margin-top:1.6rem;color:var(--red);">cargo — <code>feroxbuster</code></h5>
+    <p>
+      cargo installs a Rust crate from <a href="https://crates.io" target="_blank">crates.io</a>
+      via <code>cargo install &lt;crate&gt;</code>. Use this for native-speed tools where the
+      Debian package is stale or missing — feroxbuster, rustscan, bottom, ripgrep, etc.
+      The crate name must match crates.io exactly. Binaries land in
+      <code>/root/.cargo/bin/</code> and get symlinked into <code>/usr/local/bin</code>.
+    </p>
+    <div class="ui-mockup">
+      <div class="ui-modal-header">
+        <span class="ui-title">Admin Console — cargo install</span>
+      </div>
+      <div class="ui-tabs">
+        <button class="ui-tab">APT</button>
+        <button class="ui-tab">GitHub</button>
+        <button class="ui-tab">pip</button>
+        <button class="ui-tab ui-tab-active">cargo</button>
+      </div>
+      <div class="ui-tab-content">
+        <div class="ui-form-label">Compiles via <code>cargo install</code> — installs to <code>/root/.cargo/bin/</code>.</div>
+        <div class="ui-form-row">
+          <div class="ui-form-field">
+            <div class="ui-form-label-sm">Crate name</div>
+            <input type="text" value="feroxbuster" class="ui-input" disabled>
+          </div>
+          <button class="ui-btn ui-btn-install-sm">Install</button>
+        </div>
+      </div>
+      <div class="ui-output-section">
+        <div class="ui-output-header"><span>Output</span></div>
+        <pre class="ui-output-pre"><span class="ok">[*] portalgun install cargo feroxbuster</span>
+<span class="dim">[cargo] cargo install feroxbuster</span>
+<span class="dim">[cargo]     Updating crates.io index</span>
+<span class="dim">[cargo]   Downloaded feroxbuster v2.10.4</span>
+<span class="dim">[cargo]   Downloaded 184 crates (12.3 MB)</span>
+<span class="dim">[cargo]    Compiling proc-macro2 v1.0.78</span>
+<span class="dim">[cargo]    Compiling tokio v1.36.0</span>
+<span class="dim">[cargo]    Compiling reqwest v0.11.24</span>
+<span class="dim">[cargo]    Compiling feroxbuster v2.10.4</span>
+<span class="ok">[cargo]     Finished release [optimized] target(s) in 2m 14s</span>
+<span class="ok">[cargo]   Installing /root/.cargo/bin/feroxbuster</span>
+<span class="ok">[*]   symlinked → /usr/local/bin/feroxbuster</span>
+<span class="ok">[+] Registered → /var/lib/portalgun/registry/cargo/feroxbuster.json</span>
+<span class="ok">[+] Status: ok  (took 2m 16s)</span></pre>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--subtext0);">
+      <strong>Build is from source:</strong> cargo always compiles locally so the first install
+      of a large crate (feroxbuster, tokio-based tools) can take a few minutes. Subsequent
+      <code>portalgun update</code> calls re-run <code>cargo install --force</code> and only
+      rebuild changed deps. The cargo phase has the lowest weight (5%) in the bundle progress
+      bar because there are usually only a handful of cargo entries.
+    </p>
+
+    <h5 style="margin-top:1.6rem;">Field cheat-sheet</h5>
+    <table>
+      <thead><tr><th>Phase</th><th>Required field</th><th>Optional field</th><th>Persisted to</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="phase phase-apt">APT</span></td>
+          <td>Package name</td>
+          <td>—</td>
+          <td><code>installable_packages.txt</code></td>
+        </tr>
+        <tr>
+          <td><span class="phase phase-github">GitHub</span></td>
+          <td>Repo URL (<code>.git</code>)</td>
+          <td>Target dir (<code>/opt/tools/os/category</code>)</td>
+          <td><code>installers/install_github_tools.sh</code></td>
+        </tr>
+        <tr>
+          <td><span class="phase phase-pip">pip</span></td>
+          <td>Package spec or <code>git+URL</code></td>
+          <td>Version pin (<code>==X.Y.Z</code>)</td>
+          <td><code>installable_pip.txt</code></td>
+        </tr>
+        <tr>
+          <td><span class="phase phase-cargo">cargo</span></td>
+          <td>Crate name</td>
+          <td>—</td>
+          <td><code>installable_cargo.txt</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.85rem;color:var(--subtext0);">
+      Every phase finishes by writing a JSON registry entry under
+      <code>/var/lib/portalgun/registry/&lt;phase&gt;/&lt;id&gt;.json</code> and regenerating
+      <code>/opt/tools-docs/portalgun_tools.json</code> so the web UI picks up the new tool
+      without a server restart.
+    </p>
   </section>
 
   <section class="section" id="admin-progress">

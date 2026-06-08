@@ -464,10 +464,8 @@
       "mesa-common-dev",
       "mingw-w64",
       "minisign",
-      "mono-complete",
       "mono-devel",
       "mono-libraries",
-      "mono-mcs",
       "mono-runtime",
       "mpi-default-bin",
       "mpi-default-dev",
@@ -1112,6 +1110,14 @@
         "target": "/opt/tools/linux/re"
       },
       {
+        "url": "https://github.com/aradex-io/aranum.git",
+        "target": "/opt/tools/enumeration/recon"
+      },
+      {
+        "url": "https://github.com/aradex-io/CloudGraph.git",
+        "target": "/opt/tools/cloud/multi"
+      },
+      {
         "url": "https://github.com/attify/firmware-analysis-toolkit.git",
         "target": "/opt/tools/embedded/firmware"
       },
@@ -1364,6 +1370,14 @@
         "target": "/opt/tools/windows/ad"
       },
       {
+        "url": "https://github.com/jeremylaratro/0xPR0MPT.git",
+        "target": "/opt/tools/linux/misc"
+      },
+      {
+        "url": "https://github.com/jesseduffield/lazydocker.git",
+        "target": "/opt/tools/linux/misc"
+      },
+      {
         "url": "https://github.com/jondonas/linux-exploit-suggester-2.git",
         "target": "/opt/tools/linux/privesc"
       },
@@ -1512,12 +1526,12 @@
         "target": "/opt/tools/windows/ad"
       },
       {
-        "url": "https://github.com/NHAS/reverse_ssh.git",
-        "target": "/opt/tools/tunneling/c2"
-      },
-      {
         "url": "https://github.com/NH-RED-TEAM/RustHound.git",
         "target": "/opt/tools/windows/ad"
+      },
+      {
+        "url": "https://github.com/NHAS/reverse_ssh.git",
+        "target": "/opt/tools/tunneling/c2"
       },
       {
         "url": "https://github.com/nickvourd/Supernova.git",
@@ -1554,10 +1568,6 @@
       {
         "url": "https://github.com/p3ta00/killshot.git",
         "target": "/opt/tools/windows/evasion"
-      },
-      {
-        "url": "https://github.com/p3ta00/react2shell-poc.git",
-        "target": "/opt/tools/linux/exploit"
       },
       {
         "url": "https://github.com/p3ta00/react2shell-poc.git",
@@ -1790,10 +1800,6 @@
       {
         "url": "https://github.com/zyn3rgy/LdapRelayScan.git",
         "target": "/opt/tools/windows/ad"
-      },
-      {
-        "url": "https://github.com/jesseduffield/lazydocker.git",
-        "target": "/opt/tools/linux/misc"
       }
     ],
     "pip": [
@@ -2596,10 +2602,8 @@
       "widgetsnbextension==4.0.15",
       "winacl==0.1.9",
       "wrapt==2.1.1",
-      "wsaccel==0.6.3",
       "wsproto",
       "wtforms==3.2.1",
-      "wxpython==4.2.4",
       "xdg",
       "xlsxwriter==3.1.9",
       "xmltodict==0.13.0",

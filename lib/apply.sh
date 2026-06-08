@@ -157,7 +157,14 @@ apply_bundle() {
         local apt_needed=()
         while IFS= read -r pkg; do
             [ -z "$pkg" ] && continue
-            registry_exists apt "$pkg" || apt_needed+=("$pkg")
+            # Skip if either the registry knows about it OR dpkg shows it
+            # installed system-wide. Falling back to dpkg keeps idempotency
+            # honest when apt was driven by install.sh's legacy path (which
+            # doesn't touch the registry) or by manual sysadmin work.
+            if registry_exists apt "$pkg" || dpkg -s "$pkg" >/dev/null 2>&1; then
+                continue
+            fi
+            apt_needed+=("$pkg")
         done < <(jq -r '.tools.apt[]' "$bundle_file")
 
         local apt_skip=$(( apt_count - ${#apt_needed[@]} ))
@@ -219,7 +226,12 @@ apply_bundle() {
             local pct=$(( 36 + ( gh_done * 43 / github_count ) ))
             _progress "$pct" "Phase 2: GitHub [$gh_done/$github_count] $name"
 
-            if registry_exists github "${name}_"; then
+            # Idempotency: registry knows about it OR the tool_dir exists on
+            # disk with content (handles legacy install_github_tools.sh which
+            # doesn't write the registry).
+            local tool_dir="$target/$name"
+            if registry_exists github "${name}_" || \
+               { [ -d "$tool_dir" ] && [ -n "$(ls -A "$tool_dir" 2>/dev/null)" ]; }; then
                 printf "  ${CYAN}[skip]${NC} %s\n" "$name"
                 (( gh_skip++ )) || true
             else
@@ -255,8 +267,13 @@ apply_bundle() {
             "$VENV_PIP" install --quiet --upgrade pip setuptools wheel
         fi
 
-        # Write requirements.txt and install all at once
-        # pip resolves the full dependency graph together — no batching conflicts
+        # System build-deps for native pip packages (dbus-python, pycairo, etc.)
+        # Without these, single-package builds abort the entire batch.
+        local pip_build_deps="libdbus-1-dev libgirepository1.0-dev libcairo2-dev pkg-config python3-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libpcap-dev libkrb5-dev libldap2-dev libsasl2-dev"
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q $pip_build_deps >/dev/null 2>&1 || \
+            print_warning "Some pip build-deps could not be installed"
+
+        # Write requirements.txt
         local req_file
         req_file=$(mktemp /tmp/portalgun_req_XXXXXX.txt)
         jq -r '(.tools.pip // [])[]' "$bundle_file" > "$req_file"
@@ -266,35 +283,55 @@ apply_bundle() {
         print_status "  Installing $pip_total packages via requirements.txt..."
         _progress 82 "Phase 3: pip — resolving and installing $pip_total packages..."
 
-        # Use mktemp for safety — never reuse fixed /tmp paths as root
+        # Phase A: bulk install — fast path, gets ~95% of packages in ~3min
         local pip_tmp pip_fail_log
         pip_tmp=$(mktemp /tmp/pg_pip_XXXXXX.tmp)
         chmod 600 "$pip_tmp"
         pip_fail_log="$PORTALGUN_LOG_DIR/pip_failures.log"
-        # Stream pip output — capture all, show only real errors
-        "$VENV_PIP" install --quiet -r "$req_file" 2>&1 | \
-            tee "$pip_tmp" | \
-            grep -E "^ERROR|× Failed|Cannot install|Failed to build|ResolutionImpossible" | \
-            grep -v "dependency resolver does not currently" || true
-        local fail_count
-        fail_count=$(grep -cE "^ERROR:|× Failed" "$pip_tmp" 2>/dev/null | tr -d '[:space:]' || echo 0)
-        fail_count="${fail_count:-0}"
-        if [ "$fail_count" -gt 0 ] 2>/dev/null; then
-            grep -E "^ERROR:|× Failed" "$pip_tmp" >> "$pip_fail_log" 2>/dev/null || true
-            print_warning "$fail_count pip packages failed — see $pip_fail_log"
+        : > "$pip_fail_log"
+        "$VENV_PIP" install --prefer-binary -r "$req_file" 2>&1 | tee "$pip_tmp" | \
+            grep -E "^(ERROR|Successfully installed)" | tail -20 || true
+
+        # Phase B: discover what didn't make it and retry per-package so one
+        # build failure doesn't abort the rest.
+        local installed_set
+        installed_set=$("$VENV_PIP" list --format=freeze 2>/dev/null | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-' | sort -u)
+        local missing_pip=() pkg_name_only
+        while IFS= read -r spec; do
+            [ -z "$spec" ] && continue
+            pkg_name_only=$(echo "$spec" | sed 's/[<>=!~].*//' | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr -d ' ')
+            echo "$installed_set" | grep -qx "$pkg_name_only" || missing_pip+=("$spec")
+        done < "$req_file"
+
+        if [ "${#missing_pip[@]}" -gt 0 ]; then
+            print_status "  Retrying ${#missing_pip[@]} stragglers individually..."
+            local retry_done=0 retry_ok=0 retry_fail=0
+            for spec in "${missing_pip[@]}"; do
+                retry_done=$((retry_done + 1))
+                if "$VENV_PIP" install --quiet --prefer-binary "$spec" >/dev/null 2>>"$pip_fail_log"; then
+                    retry_ok=$((retry_ok + 1))
+                else
+                    echo "  $spec" >> "$pip_fail_log"
+                    retry_fail=$((retry_fail + 1))
+                fi
+            done
+            print_status "  Stragglers: $retry_ok installed, $retry_fail failed (log: $pip_fail_log)"
         fi
-        rm -f "$pip_tmp"
+        rm -f "$pip_tmp" "$req_file"
 
-        rm -f "$req_file"
-
-        # Register all pip packages
+        # Register only pip packages that ACTUALLY installed. Avoids the
+        # earlier bug where 822 registry entries existed but only 3 packages
+        # were truly in the venv.
+        local final_installed
+        final_installed=$("$VENV_PIP" list --format=freeze 2>/dev/null | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-' | sort -u)
         while IFS= read -r pkg_spec; do
             [ -z "$pkg_spec" ] && continue
             local pkg_name pkg_ver safe_id
             pkg_name=$(echo "$pkg_spec" | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | tr '_' '-')
             pkg_ver=$(echo "$pkg_spec" | cut -d= -f3)
             safe_id=$(echo "$pkg_name" | tr -cs 'a-z0-9._-' '_')
-            if ! registry_exists pip "$safe_id"; then
+            # Only register if pip list shows it installed
+            if echo "$final_installed" | grep -qx "$pkg_name" && ! registry_exists pip "$safe_id"; then
                 local json
                 json=$(jq -n \
                     --arg name    "$pkg_name" \
@@ -431,6 +468,26 @@ apply_bundle() {
         print_warning "Configs dir not found — skipping dotfiles phase"
     fi
     echo ""
+
+    # ── Phase 6: Burp Pro + Sliver (heavy specialty installs) ──
+    if [ "${PORTALGUN_SKIP_BURP:-0}" != "1" ]; then
+        _progress 97 "Phase 6a: Burp Suite Pro + BApps..."
+        print_status "Phase 6a: Burp Suite Pro"
+        if source "$PORTALGUN_LIB/install_burp.sh" 2>/dev/null && install_burp_pro; then
+            print_success "Burp Suite Pro installed"
+        else
+            print_warning "Burp Suite Pro install skipped/failed (non-fatal)"
+        fi
+    fi
+    if [ "${PORTALGUN_SKIP_SLIVER:-0}" != "1" ]; then
+        _progress 98 "Phase 6b: Sliver C2 + armory..."
+        print_status "Phase 6b: Sliver C2"
+        if source "$PORTALGUN_LIB/install_sliver.sh" 2>/dev/null && install_sliver; then
+            print_success "Sliver installed"
+        else
+            print_warning "Sliver install skipped/failed (non-fatal)"
+        fi
+    fi
 
     # Auto-register all installed tools so web UI search is populated
     _progress 99 "Registering tools in registry..."

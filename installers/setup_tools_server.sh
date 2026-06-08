@@ -147,9 +147,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=$USER
+User=root
 WorkingDirectory=$DOC_DIR
-ExecStart=/usr/bin/python3 $DOC_DIR/tools_server.py
+# Prefer the pentest-venv so Flask + Jinja2 are guaranteed available.
+ExecStart=/bin/sh -c 'if [ -x /opt/pentest-venv/bin/python3 ]; then exec /opt/pentest-venv/bin/python3 $DOC_DIR/tools_server.py; else exec /usr/bin/python3 $DOC_DIR/tools_server.py; fi'
 Restart=always
 RestartSec=3
 
@@ -158,7 +159,13 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-print_success "Systemd service created"
+sudo systemctl enable tools-server.service >/dev/null 2>&1 || true
+sudo systemctl start  tools-server.service >/dev/null 2>&1 || true
+if systemctl is-active tools-server.service >/dev/null 2>&1; then
+    print_success "Systemd service created, enabled, and running (tools-server.service)"
+else
+    print_warning "Systemd service created but failed to start — check: journalctl -u tools-server"
+fi
 
 # ───────────────────────────────────────────────────────────────────
 # Done

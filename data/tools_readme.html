@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kali Pentest Arsenal</title>
+    <title>Portal Gun</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231e1e2e'/%3E%3Ctext x='32' y='44' font-family='monospace' font-size='40' font-weight='bold' text-anchor='middle' fill='%23cba6f7'%3E≫%3C/text%3E%3C/svg%3E">
     <style>
         :root {
@@ -102,7 +102,10 @@
 </head>
 <body>
     <header>
-        <h1>Kali Pentest Arsenal</h1>
+        <h1 style="display:flex;align-items:center;gap:14px;">
+            <img src="portalgun.png" alt="Portal Gun" width="48" height="48" style="flex-shrink:0;">
+            <span>Portal Gun</span>
+        </h1>
         <input type="text" id="search" placeholder="Search (seimpersonate, kerberos, smb, potato, nmap...)">
         <button class="filter-btn active" data-filter="all">All</button>
         <button class="filter-btn" data-filter="windows">Windows</button>
@@ -1370,7 +1373,7 @@ const toolsData = [
 
 // Render
 // Lookup: tool path → README/homepage info from registry
-window._readmeIndex = { byPath: {}, byPackage: {} };
+window._readmeIndex = { byPath: {}, byPackage: {}, byName: {} };
 
 function readmeButtonFor(tool) {
     // Try lookup by path (works for static tools that match installed tool_dir)
@@ -1384,6 +1387,14 @@ function readmeButtonFor(tool) {
     if (!info && tool.type === 'apt') {
         info = window._readmeIndex.byPackage[tool.path] || window._readmeIndex.byPackage[tool.name.toLowerCase()];
         if (info) repoUrl = info.homepage || '';
+    }
+    // Static-tool fallback: cached README fetched by fetch_static_readmes.py keyed by exact name
+    if (!info) {
+        const byName = window._readmeIndex.byName[tool.name];
+        if (byName) {
+            info = { readme_path: byName.readme_path };
+            repoUrl = byName.repo_url || '';
+        }
     }
     if (!info) return '';
     const repoArg = repoUrl ? `, '${repoUrl.replace(/'/g, "\\'")}'` : '';
@@ -2247,26 +2258,54 @@ async function loadInstalledTools() {
                 };
             }
         }
+        // Static-tool README fallback (curated/searched offline cache)
+        if (data.static_readmes) {
+            for (const [name, info] of Object.entries(data.static_readmes)) {
+                window._readmeIndex.byName[name] = info;
+            }
+        }
         // Re-render static tools so they pick up the README buttons
         renderTools();
 
         if (!all.length) return;
 
-        const container = document.querySelector('.category[data-cat="installed"] .tools');
+        const resolveCat = t => {
+            const os = (t.os || '').toLowerCase();
+            const sub = (t.category || '').toLowerCase();
+            if (os === 'windows' && (sub === 'ad' || sub === 'activedirectory')) return 'windows-ad';
+            if (os === 'windows' && (sub === 'credentials' || sub === 'creds')) return 'windows-creds';
+            if (os === 'windows' && sub === 'privesc') return 'windows-privesc';
+            if (os === 'windows') return 'windows-ad';
+            if (os === 'linux') return 'linux';
+            if (os === 'cloud') return 'cloud';
+            if (os === 'container') return 'container';
+            if (os === 'embedded') return 'embedded';
+            if (os === 'forensics' || sub === 'forensics') return 'forensics';
+            if (os === 'tunneling') return 'tunneling';
+            if (os === 'enumeration' || sub === 'recon') return 'recon';
+            if (os === 'web') return 'web';
+            if (os === 'network') return 'network';
+            if (os === 'evasion' || sub === 'evasion') return 'evasion';
+            return 'installed';
+        };
         all.forEach(t => {
+            const cat = t.type === 'github' ? resolveCat(t) : 'installed';
+            const installPath = t.tool_dir || t.url || t.package || '';
             const entry = {
                 name: t.name,
-                path: t.url || t.package || '',
+                path: installPath,
                 desc: t.type === 'apt'
                     ? `apt package · v${t.version || '?'}`
-                    : `${t.repo || ''} · ${t.os || ''}/${t.category || ''}`,
+                    : `${t.repo || ''}${t.url ? ' · ' + t.url : ''}`,
                 type: t.type,
-                cat: 'installed',
+                cat: cat,
                 tags: ['installed', t.type, t.name]
             };
             toolsData.push(entry);
             const idx = toolsData.length - 1;
             const typeClass = {github:'github',apt:'apt',pip:'pip'}[t.type] || '';
+            const targetSection = document.querySelector(`.category[data-cat="${cat}"] .tools`)
+                || document.querySelector('.category[data-cat="installed"] .tools');
             const div = document.createElement('div');
             div.className = 'tool visible';
             div.dataset.idx = idx;
@@ -2274,7 +2313,7 @@ async function loadInstalledTools() {
             div.dataset.name = entry.name.toLowerCase();
             div.dataset.desc = entry.desc.toLowerCase();
             div.dataset.type = entry.type;
-            div.dataset.cat = 'installed';
+            div.dataset.cat = cat;
             let readmeBtn = '';
             if (t.type === 'github' && t.readme_path) {
                 const src = t.url ? `, '${t.url}'` : '';
@@ -2290,7 +2329,7 @@ async function loadInstalledTools() {
                 <span class="tool-desc">${entry.desc}</span>
                 <span class="tool-tags">${entry.tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')} ${readmeBtn}</span>
             `;
-            container.appendChild(div);
+            (targetSection || container).appendChild(div);
         });
         updateCount();
     } catch (e) { /* portalgun_tools.json not available */ }
@@ -2411,14 +2450,73 @@ function renderMarkdown(md) {
     const escapeHtml = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     // Extract code blocks first
     const codeBlocks = [];
-    md = md.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    // Fenced code blocks: ```lang\n...```  or  ``` \n...```  or  ~~~\n...~~~
+    md = md.replace(/(```|~~~)([a-zA-Z0-9_+\-]*)[ \t]*\r?\n([\s\S]*?)\r?\n?\1/g, (_, fence, lang, code) => {
         codeBlocks.push(`<pre><code>${escapeHtml(code)}</code></pre>`);
         return `§§CODEBLOCK${codeBlocks.length - 1}§§`;
     });
+    // Indented code blocks (legacy CommonMark): groups of lines whose leading
+    // whitespace expands to ≥4 columns (tabs round up to next multiple of 4).
+    // Block must be preceded by a blank line / heading / top-of-doc.
+    {
+        const inLines = md.split('\n');
+        const result = [];
+        let i = 0;
+        const indentCols = ln => {
+            let w = 0;
+            for (const c of ln) {
+                if (c === ' ') w++;
+                else if (c === '\t') w = Math.floor(w / 4) * 4 + 4;
+                else break;
+            }
+            return w;
+        };
+        const stripLeading = ln => {
+            let cols = 0, j = 0;
+            for (; j < ln.length && cols < 4; j++) {
+                if (ln[j] === ' ') cols++;
+                else if (ln[j] === '\t') { cols = Math.floor(cols / 4) * 4 + 4; }
+                else break;
+            }
+            return ln.slice(j);
+        };
+        const isIndent = ln => indentCols(ln) >= 4;
+        while (i < inLines.length) {
+            const ln = inLines[i];
+            const prev = result.length ? result[result.length - 1] : '';
+            const canStart = !prev.trim() || /^<h\d>|^§§/.test(prev) || /^#{1,6}\s/.test(prev);
+            if (canStart && isIndent(ln) && ln.trim()) {
+                const block = [];
+                while (i < inLines.length) {
+                    const cur = inLines[i];
+                    if (cur.trim() && !isIndent(cur)) break;
+                    // Blank line allowed only if next non-blank is still indented
+                    if (!cur.trim()) {
+                        let k = i + 1;
+                        while (k < inLines.length && !inLines[k].trim()) k++;
+                        if (k >= inLines.length || !isIndent(inLines[k])) break;
+                        block.push('');
+                        i++;
+                        continue;
+                    }
+                    block.push(stripLeading(cur));
+                    i++;
+                }
+                while (block.length && !block[block.length - 1].trim()) block.pop();
+                if (block.length) {
+                    codeBlocks.push(`<pre><code>${escapeHtml(block.join('\n'))}</code></pre>`);
+                    result.push(`§§CODEBLOCK${codeBlocks.length - 1}§§`);
+                }
+                continue;
+            }
+            result.push(ln);
+            i++;
+        }
+        md = result.join('\n');
+    }
     // Extract HTML img tags (often used in READMEs for badges/logos) so escapeHtml doesn't eat them
     const htmlImgs = [];
     md = md.replace(/<img\s+[^>]*\/?>/gi, m => {
-        // Resolve src
         m = m.replace(/src="([^"]+)"/i, (_, src) => `src="${resolveAssetUrl(src)}"`);
         m = m.replace(/src='([^']+)'/i, (_, src) => `src='${resolveAssetUrl(src)}'`);
         htmlImgs.push(m);
@@ -2429,6 +2527,19 @@ function renderMarkdown(md) {
     md = md.replace(/<a\s+[^>]*>[\s\S]*?<\/a>/gi, m => {
         htmlAnchors.push(m);
         return `§§A${htmlAnchors.length - 1}§§`;
+    });
+    // Markdown allows raw HTML — preserve any remaining tags (block/inline) so
+    // escapeHtml doesn't turn them into literal text.
+    const htmlTags = [];
+    const allowedTags = 'h[1-6]|p|br|hr|div|span|code|pre|kbd|sub|sup|small|big|b|i|em|strong|u|s|del|ins|mark|center|details|summary|picture|source|video|audio|table|thead|tbody|tr|th|td|ul|ol|li|blockquote|dl|dt|dd|figure|figcaption|nav|header|footer|section|article|aside|main';
+    md = md.replace(new RegExp(`<\\/?(?:${allowedTags})\\b[^>]*\\/?>`, 'gi'), m => {
+        htmlTags.push(m);
+        return `§§T${htmlTags.length - 1}§§`;
+    });
+    // HTML comments
+    md = md.replace(/<!--[\s\S]*?-->/g, m => {
+        htmlTags.push(m);
+        return `§§T${htmlTags.length - 1}§§`;
     });
 
     md = escapeHtml(md);
@@ -2451,12 +2562,29 @@ function renderMarkdown(md) {
            .replace(/^---+$/gm, '<hr>')
            .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
 
-    // Lists and paragraphs
+    // Lists, tables, paragraphs
     const lines = md.split('\n');
     let out = [], inList = false, listType = '';
-    for (const line of lines) {
+    const splitRow = s => s.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+    const isTableSep = s => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(s);
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         const ul = line.match(/^[-*+] (.+)$/);
         const ol = line.match(/^\d+\. (.+)$/);
+        // GFM table: header row followed by separator
+        if (line.trim().startsWith('|') && i + 1 < lines.length && isTableSep(lines[i+1])) {
+            if (inList) { out.push(`</${listType}>`); inList = false; }
+            const headers = splitRow(line.trim());
+            out.push('<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>');
+            i += 2;
+            while (i < lines.length && lines[i].trim().startsWith('|')) {
+                out.push('<tr>' + splitRow(lines[i].trim()).map(c => `<td>${c}</td>`).join('') + '</tr>');
+                i++;
+            }
+            out.push('</tbody></table>');
+            i--; // re-check current line in next iteration
+            continue;
+        }
         if (ul) {
             if (!inList || listType !== 'ul') { if (inList) out.push(`</${listType}>`); out.push('<ul>'); inList = true; listType = 'ul'; }
             out.push(`<li>${ul[1]}</li>`);
@@ -2466,7 +2594,8 @@ function renderMarkdown(md) {
         } else {
             if (inList) { out.push(`</${listType}>`); inList = false; }
             if (line.trim()) {
-                out.push(line.match(/^<(h\d|blockquote|pre|hr|img|a\s)/) ? line : `<p>${line}</p>`);
+                const skipWrap = line.match(/^<(h\d|blockquote|pre|hr|img|a\s|table|ul|ol|div)/) || line.startsWith('§§');
+                out.push(skipWrap ? line : `<p>${line}</p>`);
             }
         }
     }
@@ -2477,6 +2606,7 @@ function renderMarkdown(md) {
     codeBlocks.forEach((cb, i) => { html = html.replace(`§§CODEBLOCK${i}§§`, cb); });
     htmlImgs.forEach((img, i) => { html = html.replace(`§§IMG${i}§§`, img); });
     htmlAnchors.forEach((a, i) => { html = html.replace(`§§A${i}§§`, a); });
+    htmlTags.forEach((t, i) => { html = html.replace(`§§T${i}§§`, t); });
     return html;
 }
 loadInstalledTools();

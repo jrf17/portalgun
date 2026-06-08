@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
+master_install.log
+tests/logs/
+/var/log/portalgun/
+
+# Local build artefacts
+*.tgz
+*.tar.gz
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Temp test files
+/tmp/portalgun-*
+/tmp/static-readmes/
+/tmp/static_tools.json
+/tmp/static-tools-map.json
+/tmp/bapps*
+/tmp/sliver-armory*
+
+# Large pre-built asset bundles (regen via lib/preload_sliver_armory.py)
+# Keep the catalog index for offline UX but exclude the 124MB armory tarballs.
+data/sliver-armory/
+
+# But DO keep the small catalog index + BApp catalog (offline-required)
+!data/bapp-catalog.json

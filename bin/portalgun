@@ -44,12 +44,16 @@ portalgun — install tools and register them in scripts + web UI
 USAGE
     portalgun install apt <package>
     portalgun install github <url> [target-dir]
+    portalgun install burp                     # Burp Pro JAR + Java 21 + all BApps preloaded
+    portalgun install sliver                   # Sliver C2 + full armory preloaded
     portalgun install all [bundle.json]        # install everything from bundle
-    portalgun update                           # apt upgrade + pull/rebuild all github tools
+    portalgun import burp-license <prefs.xml>  # import your registered Burp Pro license blob
+    portalgun update [burp|sliver]             # default: apt+github+pip+cargo; sub: just that one
     portalgun register                         # backfill registry from current installed state
     portalgun export [outfile]                 # dump registry → portalgun_bundle.json
     portalgun list [apt|github|all]
     portalgun status
+    portalgun verify [bundle.json]             # audit bundle vs installed reality
     portalgun doctor [--fix-shadows]
     portalgun sanitize [--yes]
     portalgun help
@@ -57,12 +61,23 @@ USAGE
 EXAMPLES
     sudo portalgun install apt nmap
     sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/windows/exploit
+    sudo portalgun install burp                # downloads latest Pro + every BApp
+    sudo portalgun import burp-license ~/my-burp-prefs.xml
+    sudo portalgun install sliver              # installs sliver, runs `armory install all`
     sudo portalgun install all                 # replay from default portalgun_bundle.json
     sudo portalgun install all /tmp/bundle.json
     portalgun export                           # writes portalgun_bundle.json
     portalgun list github
     portalgun doctor
     sudo portalgun sanitize                    # prep VM for cloning (DESTRUCTIVE)
+
+BURP PRO NOTES
+    - License is NEVER baked in. Each operator imports their own prefs.xml.
+    - The activated prefs.xml lives at ~/.java/.userPrefs/burp/prefs.xml on the
+      machine where Burp was registered. Copy it off, then on the new box run:
+          sudo portalgun import burp-license /path/to/prefs.xml
+    - 'portalgun update burp' re-downloads the latest JAR and re-applies the
+      stored license so Pro stays activated across updates.
 
 EVERY install ALSO:
     1. Records the tool in the registry (/var/lib/portalgun/registry/)
@@ -95,6 +110,16 @@ case "$cmd" in
                 source "$PORTALGUN_LIB/install_github.sh"
                 install_github "$@"
                 ;;
+            burp|burp-pro)
+                shift
+                source "$PORTALGUN_LIB/install_burp.sh"
+                install_burp_pro "$@"
+                ;;
+            sliver)
+                shift
+                source "$PORTALGUN_LIB/install_sliver.sh"
+                install_sliver "$@"
+                ;;
             all)
                 shift
                 source "$PORTALGUN_LIB/apply.sh"
@@ -111,8 +136,38 @@ case "$cmd" in
         esac
         ;;
     update)
-        source "$PORTALGUN_LIB/update.sh"
-        update_all
+        sub="${1:-}"
+        case "$sub" in
+            burp|burp-pro)
+                source "$PORTALGUN_LIB/install_burp.sh"
+                update_burp_pro
+                ;;
+            sliver)
+                source "$PORTALGUN_LIB/install_sliver.sh"
+                update_sliver
+                ;;
+            *)
+                source "$PORTALGUN_LIB/update.sh"
+                update_all
+                ;;
+        esac
+        ;;
+    import)
+        sub="${1:-}"; shift || true
+        case "$sub" in
+            burp-license)
+                source "$PORTALGUN_LIB/install_burp.sh"
+                import_burp_license "${1:-}"
+                ;;
+            "")
+                print_error "Usage: portalgun import <burp-license> <path>"
+                exit 1
+                ;;
+            *)
+                print_error "Unknown import target: $sub"
+                exit 1
+                ;;
+        esac
         ;;
     register)
         source "$PORTALGUN_LIB/register.sh"
@@ -127,6 +182,10 @@ case "$cmd" in
         ;;
     status)
         registry_status
+        ;;
+    verify)
+        source "$PORTALGUN_LIB/verify.sh"
+        verify_install "${1:-}"
         ;;
     doctor)
         source "$PORTALGUN_LIB/doctor.sh" "$@"

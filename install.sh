@@ -205,76 +205,106 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && run_quiet git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
 [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && run_quiet git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
 
+# FZF / Zoxide / Starship / Yazi / Lazygit each hit GitHub releases or third-party
+# install scripts. These can fail transiently (rate limit, DNS) — treat them as
+# non-fatal so the rest of the install pipeline still runs to completion.
+set +e
 # FZF
 if [ ! -d "$HOME/.fzf" ]; then
     print_status "Installing FZF..."
-    run_quiet git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-    run_quiet ~/.fzf/install --all --no-bash --no-fish
+    run_quiet git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf || \
+        print_warning "FZF clone failed — skipping"
+    [ -d "$HOME/.fzf" ] && run_quiet ~/.fzf/install --all --no-bash --no-fish || true
 fi
 
 # Zoxide
 if [ ! -f "$HOME/.local/bin/zoxide" ]; then
     print_status "Installing Zoxide..."
     mkdir -p ~/.local/bin
-    run_quiet bash -c "curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash"
+    run_quiet bash -c "curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash" || \
+        print_warning "Zoxide install failed (likely GitHub rate-limited) — skipping"
 fi
 
 # Starship
 if [ ! -f "$HOME/.local/bin/starship" ]; then
     print_status "Installing Starship..."
-    run_quiet bash -c "curl -sS https://starship.rs/install.sh | sh -s -- -y -b ~/.local/bin"
+    run_quiet bash -c "curl -sS https://starship.rs/install.sh | sh -s -- -y -b ~/.local/bin" || \
+        print_warning "Starship install failed — skipping"
 fi
+set -e
 
+# Yazi / Lazygit / Tealdeer — all hit GitHub releases. Treat as non-fatal.
+set +e
 # Yazi
 if [ ! -f "$HOME/.local/bin/yazi" ]; then
     print_status "Installing Yazi..."
-    YAZI_URL=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | jq -r '.assets[] | select(.name == "yazi-x86_64-unknown-linux-gnu.zip") | .browser_download_url')
-    cd /tmp && curl -sLO "$YAZI_URL" && unzip -oq yazi-x86_64-unknown-linux-gnu.zip
-    mv yazi-x86_64-unknown-linux-gnu/yazi ~/.local/bin/
-    mv yazi-x86_64-unknown-linux-gnu/ya ~/.local/bin/
-    rm -rf yazi-x86_64-unknown-linux-gnu*
+    YAZI_URL=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | jq -r '.assets[] | select(.name == "yazi-x86_64-unknown-linux-gnu.zip") | .browser_download_url' 2>/dev/null)
+    if [ -n "$YAZI_URL" ] && [ "$YAZI_URL" != "null" ]; then
+        cd /tmp && curl -sLO "$YAZI_URL" && unzip -oq yazi-x86_64-unknown-linux-gnu.zip && \
+            mv yazi-x86_64-unknown-linux-gnu/yazi ~/.local/bin/ && \
+            mv yazi-x86_64-unknown-linux-gnu/ya ~/.local/bin/ && \
+            rm -rf yazi-x86_64-unknown-linux-gnu*
+    else
+        print_warning "Yazi: GitHub API returned no URL (rate-limited) — skipping"
+    fi
 fi
 
 # Lazygit
 if [ ! -f "$HOME/.local/bin/lazygit" ]; then
     print_status "Installing Lazygit..."
-    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | jq -r .tag_name | tr -d v)
-    cd /tmp && curl -sLO "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
-    tar xzf "lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" lazygit
-    mv lazygit ~/.local/bin/
-    rm -f "lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | jq -r .tag_name 2>/dev/null | tr -d v)
+    if [ -n "$LAZYGIT_VERSION" ] && [ "$LAZYGIT_VERSION" != "null" ]; then
+        cd /tmp && curl -sLO "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
+            tar xzf "lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" lazygit && \
+            mv lazygit ~/.local/bin/ && \
+            rm -f "lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+    else
+        print_warning "Lazygit: GitHub API returned no version (rate-limited) — skipping"
+    fi
 fi
 
 # Tealdeer
 if [ ! -f "$HOME/.local/bin/tldr" ]; then
     print_status "Installing Tealdeer..."
-    curl -sL https://github.com/tealdeer-rs/tealdeer/releases/latest/download/tealdeer-linux-x86_64-musl -o ~/.local/bin/tldr
-    chmod +x ~/.local/bin/tldr
-    run_quiet ~/.local/bin/tldr --update
+    if curl -fsSL https://github.com/tealdeer-rs/tealdeer/releases/latest/download/tealdeer-linux-x86_64-musl -o ~/.local/bin/tldr; then
+        chmod +x ~/.local/bin/tldr
+        run_quiet ~/.local/bin/tldr --update || true
+    else
+        print_warning "Tealdeer download failed — skipping"
+    fi
 fi
+set -e
 
+# Zellij / TPM / Nerd Font — non-fatal on network/rate-limit failures
+set +e
 # Zellij
 if [ ! -f "$HOME/.local/bin/zellij" ]; then
     print_status "Installing Zellij..."
-    ZELLIJ_URL=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | jq -r '.assets[] | select(.name | test("zellij-x86_64-unknown-linux-musl.tar.gz$")) | .browser_download_url')
-    cd /tmp && curl -sLO "$ZELLIJ_URL" && tar xzf zellij-x86_64-unknown-linux-musl.tar.gz
-    mv zellij ~/.local/bin/
-    rm -f zellij-x86_64-unknown-linux-musl.tar.gz
+    ZELLIJ_URL=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | jq -r '.assets[] | select(.name | test("zellij-x86_64-unknown-linux-musl.tar.gz$")) | .browser_download_url' 2>/dev/null)
+    if [ -n "$ZELLIJ_URL" ] && [ "$ZELLIJ_URL" != "null" ]; then
+        cd /tmp && curl -sLO "$ZELLIJ_URL" && tar xzf zellij-x86_64-unknown-linux-musl.tar.gz && \
+            mv zellij ~/.local/bin/ && rm -f zellij-x86_64-unknown-linux-musl.tar.gz
+    else
+        print_warning "Zellij: GitHub API returned no URL — skipping"
+    fi
 fi
 
 # TPM
-[ ! -d "$HOME/.tmux/plugins/tpm" ] && run_quiet git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+[ ! -d "$HOME/.tmux/plugins/tpm" ] && (run_quiet git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm || print_warning "TPM clone failed")
 
 # Nerd Font
 if [ ! -d "$HOME/.local/share/fonts/JetBrainsMono" ]; then
     print_status "Installing JetBrains Mono Nerd Font..."
     mkdir -p ~/.local/share/fonts
     cd ~/.local/share/fonts
-    curl -sLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-    unzip -oq JetBrainsMono.zip -d JetBrainsMono
-    rm JetBrainsMono.zip
-    run_quiet fc-cache -fv
+    if curl -fsSL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip; then
+        unzip -oq JetBrainsMono.zip -d JetBrainsMono && rm JetBrainsMono.zip
+        run_quiet fc-cache -fv || true
+    else
+        print_warning "Nerd Font download failed — skipping"
+    fi
 fi
+set -e
 
 # Copy configs
 print_status "Copying configuration files..."
@@ -382,6 +412,7 @@ sudo chmod -R 755 "$DOC_DIR"
 
 cp "$SCRIPT_DIR/data/tools_readme.html" "$DOC_DIR/index.html" 2>/dev/null || true
 cp "$SCRIPT_DIR/data/tools_server.py" "$DOC_DIR/tools_server.py" 2>/dev/null || true
+cp "$SCRIPT_DIR/data/portalgun.png" "$DOC_DIR/portalgun.png" 2>/dev/null || true
 [ -f "$SCRIPT_DIR/installers/install_github_tools.sh" ] && cp "$SCRIPT_DIR/installers/install_github_tools.sh" "$DOC_DIR/"
 
 cp "$SCRIPT_DIR/configs/zshrc" "$DOTFILES_DIR/zshrc" 2>/dev/null || true
@@ -594,6 +625,79 @@ else
 fi
 
 # ───────────────────────────────────────────────────────────────────
+# PHASE 10.5: Bundle replay — pip + cargo + registry backfill + manifest
+# install.sh's earlier phases stage apt+github via legacy installers that don't
+# touch the registry. We now run the portalgun bundle replay so that:
+#   - pentest-venv is created and 800+ pip packages installed
+#   - cargo crates are installed
+#   - the registry under /var/lib/portalgun/registry/ is populated
+#   - the web manifest /opt/tools-docs/portalgun_tools.json is generated
+# Skip with PORTALGUN_SKIP_BUNDLE=1 for very fast iteration.
+# ───────────────────────────────────────────────────────────────────
+if [ "${PORTALGUN_SKIP_BUNDLE:-0}" != "1" ] && command -v portalgun >/dev/null 2>&1; then
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo -e "  ${CYAN}PHASE 10b: Bundle replay (pip + cargo + register + sync_web)${NC}  [91%]"
+    echo "═══════════════════════════════════════════════════════════════════"
+    set +e
+    # Full bundle replay. apply.sh is fully idempotent per-package; already-
+    # installed entries are skipped fast (~50ms each).
+    #   - apt: backfills the 12-or-so packages installable_packages.txt missed
+    #   - github: clones the ~64 bundle entries the legacy script didn't cover
+    #   - pip: creates pentest-venv and installs all spec'd packages
+    #   - cargo: installs all crates
+    #   - register_all + sync_web_manifest at the tail → populates /var/lib + manifest
+    # Burp/Sliver still skipped here; they run as explicit Phase 11/12 below.
+    PORTALGUN_SKIP_BURP=1 PORTALGUN_SKIP_SLIVER=1 \
+        sudo -E bash -c "source /opt/portalgun/lib/apply.sh && apply_bundle /opt/portalgun/portalgun_bundle.json" 2>&1 | tee -a "$LOG_FILE"
+    bundle_rc=${PIPESTATUS[0]}
+    set -e
+    if [ $bundle_rc -eq 0 ]; then
+        print_success "Bundle replay complete — registry + manifest populated"
+    else
+        print_warning "Bundle replay had issues — run: portalgun verify"
+    fi
+fi
+
+# ───────────────────────────────────────────────────────────────────
+# PHASE 11: Burp Suite Pro (download + BApps + license import)
+# Skip with PORTALGUN_SKIP_BURP=1 (saves ~10min and ~1GB during dev iterations).
+# ───────────────────────────────────────────────────────────────────
+if [ "${PORTALGUN_SKIP_BURP:-0}" != "1" ]; then
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo -e "  ${CYAN}PHASE 11/12: Burp Suite Pro + BApps${NC}                     [92%]"
+    echo "═══════════════════════════════════════════════════════════════════"
+    set +e
+    sudo bash -c "source /opt/portalgun/lib/install_burp.sh && install_burp_pro" 2>&1 | tee -a "$LOG_FILE"
+    burp_rc=${PIPESTATUS[0]}
+    set -e
+    [ $burp_rc -eq 0 ] && print_success "Burp Suite Pro installed" \
+        || print_warning "Burp Pro install non-fatal failure (see $LOG_FILE)"
+else
+    print_status "Burp Pro install SKIPPED (PORTALGUN_SKIP_BURP=1)"
+fi
+
+# ───────────────────────────────────────────────────────────────────
+# PHASE 12: Sliver C2 + armory preload
+# Skip with PORTALGUN_SKIP_SLIVER=1
+# ───────────────────────────────────────────────────────────────────
+if [ "${PORTALGUN_SKIP_SLIVER:-0}" != "1" ]; then
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo -e "  ${CYAN}PHASE 12/12: Sliver C2 + Armory${NC}                         [96%]"
+    echo "═══════════════════════════════════════════════════════════════════"
+    set +e
+    sudo bash -c "source /opt/portalgun/lib/install_sliver.sh && install_sliver" 2>&1 | tee -a "$LOG_FILE"
+    sliver_rc=${PIPESTATUS[0]}
+    set -e
+    [ $sliver_rc -eq 0 ] && print_success "Sliver installed" \
+        || print_warning "Sliver install non-fatal failure (see $LOG_FILE)"
+else
+    print_status "Sliver install SKIPPED (PORTALGUN_SKIP_SLIVER=1)"
+fi
+
+# ───────────────────────────────────────────────────────────────────
 # Done!
 # ───────────────────────────────────────────────────────────────────
 IP=$(hostname -I | awk '{print $1}')
@@ -624,6 +728,21 @@ echo "  1. Log out and back in (or run: exec zsh)"
 echo "  2. In tmux, press prefix+I to install plugins"
 echo "  3. Access tools server at http://$IP:1337"
 echo ""
+
+# Always export the install log for offline triage, regardless of debug mode.
+if [ -f "$LOG_FILE" ]; then
+    EXPORT_HELPER="$SCRIPT_DIR/lib/export_install_log.sh"
+    [ -f "$EXPORT_HELPER" ] && sudo bash "$EXPORT_HELPER" "$LOG_FILE" || true
+fi
+
+# Run portalgun verify so the install summary ends with a hard pass/fail audit.
+if command -v portalgun >/dev/null 2>&1; then
+    echo
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo -e "  ${CYAN}POST-INSTALL VERIFICATION${NC}"
+    echo "═══════════════════════════════════════════════════════════════════"
+    sudo portalgun verify 2>&1 | tee -a "$LOG_FILE"
+fi
 
 # Debug mode error summary
 if [ "$DEBUG_MODE" = true ]; then

@@ -277,6 +277,18 @@ update_all() {
     echo "  pip:    $([ $pip_ok -eq 1 ] && echo 'updated' || ([ -n "$pip_cmd" ] && echo 'failed' || echo 'not installed'))"
     echo "  cargo:  $([ $cargo_ok -eq 1 ] && echo 'updated' || (command -v cargo >/dev/null 2>&1 && echo 'failed' || echo 'not installed'))"
     echo "  binary: $bin_ok updated, $bin_fail failed (zellij, yazi, lazydocker, zjstatus)"
+
+    # Burp Pro + Sliver — only if previously installed
+    if [ -f /var/lib/portalgun/registry/burp/burp-pro.json ]; then
+        print_status "Updating Burp Suite Pro"
+        source "$PORTALGUN_LIB/install_burp.sh" 2>/dev/null && update_burp_pro && \
+            echo "  burp:   updated" || echo "  burp:   failed"
+    fi
+    if [ -f /var/lib/portalgun/registry/sliver/sliver.json ]; then
+        print_status "Updating Sliver + armory"
+        source "$PORTALGUN_LIB/install_sliver.sh" 2>/dev/null && update_sliver && \
+            echo "  sliver: updated" || echo "  sliver: failed"
+    fi
     echo ""
 
     source "$PORTALGUN_LIB/sync_web.sh"

@@ -13,6 +13,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 README_CACHE = Path("/var/cache/portalgun/apt-readmes")
+STATIC_MAP = Path("/var/cache/portalgun/static-tools-map.json")
+
+
+def _load_static_readmes() -> dict:
+    """Return mapping of static tool name -> {readme_path, repo_url}."""
+    if not STATIC_MAP.is_file():
+        return {}
+    try:
+        return json.loads(STATIC_MAP.read_text())
+    except Exception:
+        return {}
 
 
 def find_github_readme(tool_dir: str) -> str:
@@ -224,6 +235,7 @@ def main(registry_dir: str, out_file: str) -> int:
             "total": len(tools["apt"]) + len(tools["github"]),
         },
         "tools": tools,
+        "static_readmes": _load_static_readmes(),
     }
 
     out = Path(out_file)

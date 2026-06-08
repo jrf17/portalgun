@@ -41,6 +41,12 @@ rsync -a --delete "$SRC_ROOT/bin/"        "$INSTALL_ROOT/bin/"
 rsync -a --delete "$SRC_ROOT/lib/"        "$INSTALL_ROOT/lib/"
 rsync -a --delete "$SRC_ROOT/completion/" "$INSTALL_ROOT/completion/"
 rsync -a --delete "$SRC_ROOT/web/"        "$INSTALL_ROOT/web/"
+mkdir -p "$INSTALL_ROOT/data"
+[ -f "$SRC_ROOT/data/bapp-catalog.json" ] && \
+    cp "$SRC_ROOT/data/bapp-catalog.json" "$INSTALL_ROOT/data/bapp-catalog.json"
+if [ -d "$SRC_ROOT/data/sliver-armory" ]; then
+    rsync -a "$SRC_ROOT/data/sliver-armory/" "$INSTALL_ROOT/data/sliver-armory/"
+fi
 
 chmod +x "$INSTALL_ROOT/bin/portalgun" "$INSTALL_ROOT/bin/portalgun-firstboot.sh"
 chmod +x "$INSTALL_ROOT/lib/"*.py 2>/dev/null || true
