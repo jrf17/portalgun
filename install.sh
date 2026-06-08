@@ -72,6 +72,33 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Profile selection and validation require jq before Phase 1 begins.
+ensure_profile_prerequisites() {
+    command -v jq >/dev/null 2>&1 && return 0
+
+    echo "[*] Installing required profile parser: jq"
+
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get update -q
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q jq
+    else
+        command -v sudo >/dev/null 2>&1 || {
+            echo "sudo is required to install jq" >&2
+            return 1
+        }
+
+        sudo apt-get update -q
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q jq
+    fi
+
+    command -v jq >/dev/null 2>&1 || {
+        echo "jq installation failed" >&2
+        return 1
+    }
+}
+
+ensure_profile_prerequisites
+
 if [ -n "$CREATE_PROFILE" ]; then
     profile_create "$CREATE_PROFILE"
     exit $?
