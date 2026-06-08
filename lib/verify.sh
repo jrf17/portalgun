@@ -274,6 +274,26 @@ RC
         fail=$((fail + 1))
     fi
 
+    # ── Active terminal profile ─────────────────────────────────────
+    echo "── Terminal profile ──────────────────────"
+    if ! declare -F profile_verify >/dev/null 2>&1 && [ -f "${PORTALGUN_LIB:-/opt/portalgun/lib}/profile.sh" ]; then
+        source "${PORTALGUN_LIB:-/opt/portalgun/lib}/profile.sh"
+    fi
+    if declare -F profile_verify >/dev/null 2>&1; then
+        local active_profile
+        active_profile=$(profile_resolve_name "${PORTALGUN_PROFILE:-}")
+        if profile_verify "$active_profile"; then
+            _row "$PASS_MARK" "terminal profile" "$active_profile"
+            pass=$((pass + 1))
+        else
+            _row "$FAIL_MARK" "terminal profile" "$active_profile failed verification"
+            fail=$((fail + 1))
+        fi
+    else
+        _row "$WARN_MARK" "terminal profile" "profile engine unavailable"
+        warn=$((warn + 1))
+    fi
+
     # ── Registry ─────────────────────────────────────────────────────
     echo "── Registry ──────────────────────────────"
     local reg_apt reg_gh reg_pip reg_cargo

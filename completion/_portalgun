@@ -1,11 +1,20 @@
 #compdef portalgun
 # zsh completion for portalgun
 
+_portalgun_profiles() {
+    local root="${PORTALGUN_PROFILE_ROOT:-/opt/portalgun/profiles}"
+    local -a profiles
+    profiles=(${root}/*(/N:t))
+    _describe -t profiles 'Portalgun profile' profiles
+}
+
 _portalgun() {
     local context state line
     typeset -A opt_args
 
     _arguments -C \
+        '--profile[select terminal profile]:profile:_portalgun_profiles' \
+        '--target-user[profile target user]:user:_users' \
         '1: :_portalgun_commands' \
         '*::arg:->args'
 
@@ -16,24 +25,28 @@ _portalgun() {
                     if (( CURRENT == 2 )); then
                         _values 'install type' \
                             'apt[install via apt-get]' \
-                            'github[clone from GitHub, auto-detect compile]'
+                            'github[clone from GitHub, auto-detect compile]' \
+                            'burp[install Burp Suite Pro]' \
+                            'sliver[install Sliver C2]' \
+                            'all[apply the complete bundle]'
                     elif (( CURRENT >= 3 )); then
                         case $words[2] in
-                            apt)
-                                _portalgun_apt_packages
-                                ;;
+                            apt) _portalgun_apt_packages ;;
                             github)
-                                if (( CURRENT == 3 )); then
-                                    _message 'github url (https://github.com/owner/repo)'
-                                elif (( CURRENT == 4 )); then
-                                    _portalgun_tool_dirs
-                                fi
+                                (( CURRENT == 3 )) && _message 'github url (https://github.com/owner/repo)'
+                                (( CURRENT == 4 )) && _portalgun_tool_dirs
                                 ;;
                         esac
                     fi
                     ;;
-                list)
-                    _values 'type' 'all' 'apt' 'github'
+                list) _values 'type' 'all' 'apt' 'github' ;;
+                update) _values 'target' 'burp' 'sliver' ;;
+                profile)
+                    if (( CURRENT == 2 )); then
+                        _values 'profile command' list show create validate apply current verify
+                    elif (( CURRENT == 3 )); then
+                        case $words[2] in show|validate|apply|verify) _portalgun_profiles;; create) _message 'new profile name';; esac
+                    fi
                     ;;
             esac
             ;;
@@ -43,18 +56,23 @@ _portalgun() {
 _portalgun_commands() {
     local -a commands
     commands=(
-        'install:install a tool and register it (apt|github)'
-        'list:list installed tools (all|apt|github)'
+        'install:install tools or replay the bundle'
+        'update:update installed tools'
+        'import:import operator-specific data such as a Burp license'
+        'register:backfill the registry'
+        'export:export the current bundle'
+        'list:list installed tools'
         'status:show registry status'
+        'verify:audit tools, services, and the active profile'
+        'profile:list, create, validate, apply, or verify terminal profiles'
         'doctor:diagnose registry, symlinks, and services'
-        'sanitize:prep VM for cloning (DESTRUCTIVE — clears history/logs/identity)'
+        'sanitize:prep VM for cloning (DESTRUCTIVE)'
         'help:show usage'
     )
     _describe -t commands 'portalgun command' commands
 }
 
 _portalgun_apt_packages() {
-    # Use cached apt package names; refresh occasionally for speed
     local cache=${ZSH_CACHE_DIR:-$HOME/.cache/zsh}/portalgun-apt-pkgs
     mkdir -p "${cache:h}"
     if [[ ! -f $cache ]] || [[ $(find "$cache" -mtime +1 2>/dev/null) ]]; then
@@ -70,7 +88,6 @@ _portalgun_apt_packages() {
 }
 
 _portalgun_tool_dirs() {
-    # Complete subdirectories under /opt/tools/ for github target argument
     local base="${PORTALGUN_TOOLS_BASE:-/opt/tools}"
     local cache=${ZSH_CACHE_DIR:-$HOME/.cache/zsh}/portalgun-tooldirs
     mkdir -p "${cache:h}"

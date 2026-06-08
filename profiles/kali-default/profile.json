@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "kali-default",
+  "description": "Preserve Kali's terminal, shell, and dotfile defaults",
+  "owner": "Kali default",
+  "targets": ["current"],
+  "terminal": {"provider": "none"},
+  "multiplexers": [],
+  "shell": {"provider": "none", "set_as_default": false},
+  "framework": {"provider": "none", "plugins": [], "external_plugins": []},
+  "helpers": [],
+  "packages": {"apt": []},
+  "dotfiles": {"source": "dotfiles", "strategy": "none", "backup_existing": false}
+}

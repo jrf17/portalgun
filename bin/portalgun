@@ -23,8 +23,17 @@ fi
 
 # Bundle search path — also check /opt/portalgun directly
 export PORTALGUN_BUNDLE_SEARCH="/opt/portalgun/portalgun_bundle.json /home/kali/portalgun/portalgun_bundle.json"
+if [ -z "${PORTALGUN_PROFILE_ROOT:-}" ]; then
+    if [ -d "$PORTALGUN_REPO_DIR/profiles" ]; then
+        PORTALGUN_PROFILE_ROOT="$PORTALGUN_REPO_DIR/profiles"
+    else
+        PORTALGUN_PROFILE_ROOT="$PORTALGUN_ROOT/profiles"
+    fi
+fi
+PORTALGUN_COMPONENT_ROOT="${PORTALGUN_COMPONENT_ROOT:-$PORTALGUN_ROOT/components}"
 export PORTALGUN_ROOT PORTALGUN_LIB PORTALGUN_REGISTRY PORTALGUN_LOG_DIR \
-       PORTALGUN_TOOLS_BASE PORTALGUN_WEB_DIR PORTALGUN_REPO_DIR
+       PORTALGUN_TOOLS_BASE PORTALGUN_WEB_DIR PORTALGUN_REPO_DIR \
+       PORTALGUN_PROFILE_ROOT PORTALGUN_COMPONENT_ROOT
 
 # ─── Load common lib ─────────────────────────────────────────────────
 if [ ! -f "$PORTALGUN_LIB/common.sh" ]; then
@@ -35,6 +44,7 @@ fi
 source "$PORTALGUN_LIB/common.sh"
 source "$PORTALGUN_LIB/registry.sh"
 source "$PORTALGUN_LIB/detect.sh"
+[ -f "$PORTALGUN_LIB/profile.sh" ] && source "$PORTALGUN_LIB/profile.sh"
 
 # ─── Usage ───────────────────────────────────────────────────────────
 usage() {
@@ -42,7 +52,7 @@ usage() {
 portalgun — install tools and register them in scripts + web UI
 
 USAGE
-    portalgun install apt <package>
+    portalgun [--profile NAME] install apt <package>
     portalgun install github <url> [target-dir]
     portalgun install burp                     # Burp Pro JAR + Java 21 + all BApps preloaded
     portalgun install sliver                   # Sliver C2 + full armory preloaded
@@ -53,7 +63,8 @@ USAGE
     portalgun export [outfile]                 # dump registry → portalgun_bundle.json
     portalgun list [apt|github|all]
     portalgun status
-    portalgun verify [bundle.json]             # audit bundle vs installed reality
+    portalgun verify [bundle.json]             # audit bundle + active profile
+    portalgun profile <list|show|create|validate|apply|current|verify>
     portalgun doctor [--fix-shadows]
     portalgun sanitize [--yes]
     portalgun help
@@ -68,6 +79,8 @@ EXAMPLES
     sudo portalgun install all /tmp/bundle.json
     portalgun export                           # writes portalgun_bundle.json
     portalgun list github
+    portalgun profile list
+    sudo portalgun --profile joseph profile apply
     portalgun doctor
     sudo portalgun sanitize                    # prep VM for cloning (DESTRUCTIVE)
 
@@ -90,10 +103,29 @@ ENVIRONMENT (defaults shown)
     PORTALGUN_TOOLS_BASE=/opt/tools
     PORTALGUN_WEB_DIR=/opt/tools-docs
     PORTALGUN_REPO_DIR=auto-detected (~/portalgun)
+    PORTALGUN_PROFILE=default unless explicitly selected or recorded
+    PORTALGUN_PROFILE_ROOT=/opt/portalgun/profiles
 EOF
 }
 
-# ─── Dispatch ────────────────────────────────────────────────────────
+# ─── Global options + dispatch ───────────────────────────────────────
+# Global options are parsed before command dispatch, so these are equivalent:
+#   portalgun --profile joseph profile apply
+#   portalgun profile apply joseph
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --profile)
+            [ "$#" -ge 2 ] || { print_error "--profile requires a name"; exit 64; }
+            PORTALGUN_PROFILE="$2"; export PORTALGUN_PROFILE; shift 2 ;;
+        --profile=*) PORTALGUN_PROFILE="${1#*=}"; export PORTALGUN_PROFILE; shift ;;
+        --target-user)
+            [ "$#" -ge 2 ] || { print_error "--target-user requires a username"; exit 64; }
+            PORTALGUN_TARGET_USER="$2"; export PORTALGUN_TARGET_USER; shift 2 ;;
+        --target-user=*) PORTALGUN_TARGET_USER="${1#*=}"; export PORTALGUN_TARGET_USER; shift ;;
+        *) break ;;
+    esac
+done
+
 cmd="${1:-help}"; shift || true
 
 case "$cmd" in
@@ -186,6 +218,13 @@ case "$cmd" in
     verify)
         source "$PORTALGUN_LIB/verify.sh"
         verify_install "${1:-}"
+        ;;
+    profile)
+        if ! declare -F profile_command >/dev/null 2>&1; then
+            print_error "Profile engine not installed"
+            exit 1
+        fi
+        profile_command "$@"
         ;;
     doctor)
         source "$PORTALGUN_LIB/doctor.sh" "$@"

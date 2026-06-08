@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "name": "default",
+  "description": "Upstream Portalgun terminal environment",
+  "owner": "Portalgun upstream",
+  "targets": ["current", "root"],
+  "terminal": {"provider": "kitty"},
+  "multiplexers": ["tmux", "zellij"],
+  "shell": {"provider": "zsh", "set_as_default": true},
+  "framework": {
+    "provider": "oh-my-zsh",
+    "plugins": ["git", "zsh-autosuggestions", "zsh-syntax-highlighting"],
+    "external_plugins": [
+      {"name": "zsh-autosuggestions", "repository": "https://github.com/zsh-users/zsh-autosuggestions.git", "marker": "zsh-autosuggestions.plugin.zsh"},
+      {"name": "zsh-syntax-highlighting", "repository": "https://github.com/zsh-users/zsh-syntax-highlighting.git", "marker": "zsh-syntax-highlighting.plugin.zsh"}
+    ]
+  },
+  "helpers": ["fzf", "zoxide", "starship", "yazi", "lazygit", "tealdeer", "nerd-font"],
+  "packages": {"apt": ["fontconfig", "eza", "bat", "fd-find", "ripgrep", "btop", "neovim", "xclip"]},
+  "dotfiles": {"source": "dotfiles", "strategy": "copy", "backup_existing": true}
+}

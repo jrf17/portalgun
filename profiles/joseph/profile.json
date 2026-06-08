@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "name": "joseph",
+  "description": "Joseph's Ghostty, Zellij, Zsh, and Oh My Zsh environment",
+  "owner": "Joseph Flores",
+  "targets": ["current"],
+  "terminal": {"provider": "ghostty"},
+  "multiplexers": ["zellij"],
+  "shell": {"provider": "zsh", "set_as_default": true},
+  "framework": {
+    "provider": "oh-my-zsh",
+    "plugins": ["git", "sudo", "zsh-autosuggestions", "you-should-use", "zsh-bat", "zsh-syntax-highlighting"],
+    "external_plugins": [
+      {"name": "zsh-autosuggestions", "repository": "https://github.com/zsh-users/zsh-autosuggestions.git", "marker": "zsh-autosuggestions.plugin.zsh"},
+      {"name": "you-should-use", "repository": "https://github.com/MichaelAquilina/zsh-you-should-use.git", "marker": "you-should-use.plugin.zsh"},
+      {"name": "zsh-bat", "repository": "https://github.com/fdellwing/zsh-bat.git", "marker": "zsh-bat.plugin.zsh"},
+      {"name": "zsh-syntax-highlighting", "repository": "https://github.com/zsh-users/zsh-syntax-highlighting.git", "marker": "zsh-syntax-highlighting.plugin.zsh"}
+    ]
+  },
+  "helpers": ["fzf", "zoxide", "starship", "yazi", "lazygit", "tealdeer", "nerd-font"],
+  "packages": {"apt": ["fontconfig", "eza", "bat", "fd-find", "ripgrep", "btop", "neovim", "xclip"]},
+  "dotfiles": {"source": "dotfiles", "strategy": "copy", "backup_existing": true}
+}

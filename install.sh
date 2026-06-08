@@ -14,30 +14,84 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Parse arguments
-DEBUG_MODE=false
-for arg in "$@"; do
-    case $arg in
-        --debug|-d)
-            DEBUG_MODE=true
-            shift
-            ;;
-        --help|-h)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --debug, -d    Enable debug mode with verbose logging"
-            echo "  --help, -h     Show this help message"
-            echo ""
-            echo "Debug mode logs all output with timestamps to master_debug.log"
-            exit 0
-            ;;
-    esac
-done
-
+# Repository paths and profile-aware argument parsing
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/master_install.log"
 DEBUG_LOG="$SCRIPT_DIR/master_debug.log"
+PORTALGUN_PROFILE_ROOT="$SCRIPT_DIR/profiles"
+PORTALGUN_COMPONENT_ROOT="$SCRIPT_DIR/components"
+export PORTALGUN_PROFILE_ROOT PORTALGUN_COMPONENT_ROOT PORTALGUN_REPO_DIR="$SCRIPT_DIR"
+
+# shellcheck source=lib/profile.sh
+source "$SCRIPT_DIR/lib/profile.sh"
+
+DEBUG_MODE=false
+PROFILE_NAME=""
+CREATE_PROFILE=""
+VALIDATE_ONLY=false
+NON_INTERACTIVE=false
+TARGET_USER="${USER}"
+
+usage() {
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Options:
+  --profile NAME          Use a terminal profile
+  --create-profile NAME   Create a profile interactively and exit
+  --validate-profile      Validate the selected profile and exit
+  --target-user USER      Apply the profile to USER (default: $USER)
+  --non-interactive       Require an explicit profile and skip confirmation
+  --debug, -d             Enable debug mode with verbose logging
+  --help, -h              Show this help message
+
+Without --profile, an interactive terminal presents the available profiles.
+The provider value "none" preserves the corresponding Kali default.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --profile)
+            [ "$#" -ge 2 ] || { echo "--profile requires a name" >&2; exit 64; }
+            PROFILE_NAME="$2"; shift 2 ;;
+        --profile=*) PROFILE_NAME="${1#*=}"; shift ;;
+        --create-profile)
+            [ "$#" -ge 2 ] || { echo "--create-profile requires a name" >&2; exit 64; }
+            CREATE_PROFILE="$2"; shift 2 ;;
+        --create-profile=*) CREATE_PROFILE="${1#*=}"; shift ;;
+        --validate-profile) VALIDATE_ONLY=true; shift ;;
+        --target-user)
+            [ "$#" -ge 2 ] || { echo "--target-user requires a username" >&2; exit 64; }
+            TARGET_USER="$2"; shift 2 ;;
+        --target-user=*) TARGET_USER="${1#*=}"; shift ;;
+        --non-interactive) NON_INTERACTIVE=true; shift ;;
+        --debug|-d) DEBUG_MODE=true; shift ;;
+        --help|-h) usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage; exit 64 ;;
+    esac
+done
+
+if [ -n "$CREATE_PROFILE" ]; then
+    profile_create "$CREATE_PROFILE"
+    exit $?
+fi
+
+if [ -z "$PROFILE_NAME" ]; then
+    if [ "$NON_INTERACTIVE" = true ] || [ ! -t 0 ]; then
+        echo "--profile is required for non-interactive installation" >&2
+        exit 64
+    fi
+    PROFILE_NAME="$(profile_select_interactive)"
+fi
+
+profile_validate "$PROFILE_NAME" || exit 1
+if [ "$VALIDATE_ONLY" = true ]; then
+    exit 0
+fi
+
+id "$TARGET_USER" >/dev/null 2>&1 || { echo "Target user not found: $TARGET_USER" >&2; exit 1; }
+export PORTALGUN_PROFILE="$PROFILE_NAME" PORTALGUN_TARGET_USER="$TARGET_USER"
 
 # Output functions - quiet in normal mode, verbose in debug
 print_status() { echo -e "${BLUE}[*]${NC} $1"; }
@@ -105,8 +159,10 @@ echo "════════════════════════�
 echo "           Kali Linux Master Setup"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
+profile_summary "$PORTALGUN_PROFILE"
+echo ""
 echo "This will install:"
-echo "  1. Terminal environment (Zsh, Tmux, Starship, FZF, etc.)"
+echo "  1. Profile-driven terminal environment"
 echo "  2. System libraries"
 echo "  3. Kali tools from apt repositories"
 echo "  4. Security tools from GitHub"
@@ -115,8 +171,10 @@ echo "  6. BloodHound CE (Docker, port 1338, seed-restored)"
 echo "  7. Firefox profile (extensions, saved logins) from seed"
 echo "  8. portalgun (tool installer + symlink manager + VM clone helper)"
 echo ""
-print_warning "Press ENTER to continue or Ctrl+C to abort..."
-read -r
+if [ "$NON_INTERACTIVE" != true ]; then
+    print_warning "Press ENTER to continue or Ctrl+C to abort..."
+    read -r
+fi
 
 # Start logging
 > "$LOG_FILE"  # Clear/create log file
@@ -169,7 +227,7 @@ sudo apt-get update -q 2>&1 | tee -a "$LOG_FILE" | grep -E "^(Get:|Hit:|Fetched|
 # Install essential tools needed by this script FIRST
 print_status "Installing script dependencies..."
 wait_for_apt
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q curl wget git jq unzip >> "$LOG_FILE" 2>&1
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q curl wget git jq unzip rsync >> "$LOG_FILE" 2>&1
 
 print_status "Upgrading existing packages..."
 wait_for_apt
@@ -184,150 +242,16 @@ print_success "System updated"
 # ───────────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════════════"
-echo -e "  ${CYAN}PHASE 2/10: Terminal Environment${NC}                       [10%]"
+echo -e "  ${CYAN}PHASE 2/12: Terminal Profile${NC}                           [10%]"
 echo "═══════════════════════════════════════════════════════════════════"
 
-# Create directories first
-mkdir -p ~/.local/bin ~/.config
+# Packages needed by later Portalgun phases regardless of terminal profile.
+print_status "Installing shared runtime packages..."
+apt_install python3-pip python3-venv python3-flask
 
-print_status "Installing terminal packages..."
-apt_install kitty zsh tmux fontconfig eza bat fd-find ripgrep btop neovim xclip python3-pip python3-venv python3-flask
-
-# Oh-My-Zsh
-if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    print_status "Installing Oh-My-Zsh..."
-    run_quiet sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-fi
-
-# Zsh plugins
-print_status "Installing Zsh plugins..."
-ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && run_quiet git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && run_quiet git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-
-# FZF / Zoxide / Starship / Yazi / Lazygit each hit GitHub releases or third-party
-# install scripts. These can fail transiently (rate limit, DNS) — treat them as
-# non-fatal so the rest of the install pipeline still runs to completion.
-set +e
-# FZF
-if [ ! -d "$HOME/.fzf" ]; then
-    print_status "Installing FZF..."
-    run_quiet git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf || \
-        print_warning "FZF clone failed — skipping"
-    [ -d "$HOME/.fzf" ] && run_quiet ~/.fzf/install --all --no-bash --no-fish || true
-fi
-
-# Zoxide
-if [ ! -f "$HOME/.local/bin/zoxide" ]; then
-    print_status "Installing Zoxide..."
-    mkdir -p ~/.local/bin
-    run_quiet bash -c "curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash" || \
-        print_warning "Zoxide install failed (likely GitHub rate-limited) — skipping"
-fi
-
-# Starship
-if [ ! -f "$HOME/.local/bin/starship" ]; then
-    print_status "Installing Starship..."
-    run_quiet bash -c "curl -sS https://starship.rs/install.sh | sh -s -- -y -b ~/.local/bin" || \
-        print_warning "Starship install failed — skipping"
-fi
-set -e
-
-# Yazi / Lazygit / Tealdeer — all hit GitHub releases. Treat as non-fatal.
-set +e
-# Yazi
-if [ ! -f "$HOME/.local/bin/yazi" ]; then
-    print_status "Installing Yazi..."
-    YAZI_URL=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | jq -r '.assets[] | select(.name == "yazi-x86_64-unknown-linux-gnu.zip") | .browser_download_url' 2>/dev/null)
-    if [ -n "$YAZI_URL" ] && [ "$YAZI_URL" != "null" ]; then
-        cd /tmp && curl -sLO "$YAZI_URL" && unzip -oq yazi-x86_64-unknown-linux-gnu.zip && \
-            mv yazi-x86_64-unknown-linux-gnu/yazi ~/.local/bin/ && \
-            mv yazi-x86_64-unknown-linux-gnu/ya ~/.local/bin/ && \
-            rm -rf yazi-x86_64-unknown-linux-gnu*
-    else
-        print_warning "Yazi: GitHub API returned no URL (rate-limited) — skipping"
-    fi
-fi
-
-# Lazygit
-if [ ! -f "$HOME/.local/bin/lazygit" ]; then
-    print_status "Installing Lazygit..."
-    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | jq -r .tag_name 2>/dev/null | tr -d v)
-    if [ -n "$LAZYGIT_VERSION" ] && [ "$LAZYGIT_VERSION" != "null" ]; then
-        cd /tmp && curl -sLO "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
-            tar xzf "lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" lazygit && \
-            mv lazygit ~/.local/bin/ && \
-            rm -f "lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
-    else
-        print_warning "Lazygit: GitHub API returned no version (rate-limited) — skipping"
-    fi
-fi
-
-# Tealdeer
-if [ ! -f "$HOME/.local/bin/tldr" ]; then
-    print_status "Installing Tealdeer..."
-    if curl -fsSL https://github.com/tealdeer-rs/tealdeer/releases/latest/download/tealdeer-linux-x86_64-musl -o ~/.local/bin/tldr; then
-        chmod +x ~/.local/bin/tldr
-        run_quiet ~/.local/bin/tldr --update || true
-    else
-        print_warning "Tealdeer download failed — skipping"
-    fi
-fi
-set -e
-
-# Zellij / TPM / Nerd Font — non-fatal on network/rate-limit failures
-set +e
-# Zellij
-if [ ! -f "$HOME/.local/bin/zellij" ]; then
-    print_status "Installing Zellij..."
-    ZELLIJ_URL=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | jq -r '.assets[] | select(.name | test("zellij-x86_64-unknown-linux-musl.tar.gz$")) | .browser_download_url' 2>/dev/null)
-    if [ -n "$ZELLIJ_URL" ] && [ "$ZELLIJ_URL" != "null" ]; then
-        cd /tmp && curl -sLO "$ZELLIJ_URL" && tar xzf zellij-x86_64-unknown-linux-musl.tar.gz && \
-            mv zellij ~/.local/bin/ && rm -f zellij-x86_64-unknown-linux-musl.tar.gz
-    else
-        print_warning "Zellij: GitHub API returned no URL — skipping"
-    fi
-fi
-
-# TPM
-[ ! -d "$HOME/.tmux/plugins/tpm" ] && (run_quiet git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm || print_warning "TPM clone failed")
-
-# Nerd Font
-if [ ! -d "$HOME/.local/share/fonts/JetBrainsMono" ]; then
-    print_status "Installing JetBrains Mono Nerd Font..."
-    mkdir -p ~/.local/share/fonts
-    cd ~/.local/share/fonts
-    if curl -fsSL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip; then
-        unzip -oq JetBrainsMono.zip -d JetBrainsMono && rm JetBrainsMono.zip
-        run_quiet fc-cache -fv || true
-    else
-        print_warning "Nerd Font download failed — skipping"
-    fi
-fi
-set -e
-
-# Copy configs
-print_status "Copying configuration files..."
-mkdir -p ~/.config/kitty ~/.config/yazi ~/.config/zellij/{layouts,scripts,plugins}
-
-cp "$SCRIPT_DIR/configs/zshrc" ~/.zshrc 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/starship.toml" ~/.config/starship.toml 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/kitty.conf" ~/.config/kitty/kitty.conf 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/tmux.conf" ~/.tmux.conf 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/zellij/config.kdl" ~/.config/zellij/ 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/zellij/themes.kdl" ~/.config/zellij/ 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/zellij/layouts/default.kdl" ~/.config/zellij/layouts/ 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/zellij/scripts/"*.sh ~/.config/zellij/scripts/ 2>/dev/null || true
-cp "$SCRIPT_DIR/configs/zellij/plugins/zjstatus.wasm" ~/.config/zellij/plugins/ 2>/dev/null || true
-chmod +x ~/.config/zellij/scripts/*.sh 2>/dev/null || true
-
-# Install tmux plugins
-[ -f "$HOME/.tmux/plugins/tpm/bin/install_plugins" ] && run_quiet "$HOME/.tmux/plugins/tpm/bin/install_plugins"
-
-# Set zsh as default
-[ "$SHELL" != "/usr/bin/zsh" ] && sudo chsh -s /usr/bin/zsh "$USER" 2>/dev/null || true
-
-print_success "Terminal environment installed"
+print_status "Applying terminal profile '$PORTALGUN_PROFILE' to $PORTALGUN_TARGET_USER..."
+profile_apply "$PORTALGUN_PROFILE" "$PORTALGUN_TARGET_USER"
+print_success "Terminal profile installed"
 
 # ───────────────────────────────────────────────────────────────────
 # PHASE 3: Libraries
@@ -568,24 +492,10 @@ if getent group docker >/dev/null; then
     sudo usermod -aG docker "$USER"
 fi
 
-# Configure XFCE panel - replace terminal with Kitty, remove text editor
-print_status "Configuring panel launchers..."
-if [ -d "$HOME/.config/xfce4/panel/launcher-7" ]; then
-    # Create Kitty launcher
-    cat > "$HOME/.config/xfce4/panel/launcher-7/kitty.desktop" << 'DESKTOP'
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Kitty
-Comment=GPU-accelerated terminal
-Exec=kitty
-Icon=kitty
-Terminal=false
-Categories=System;TerminalEmulator;
-DESKTOP
-    # Remove old terminal launchers
-    find "$HOME/.config/xfce4/panel/launcher-7/" -name "*.desktop" ! -name "kitty.desktop" -delete 2>/dev/null || true
-fi
+# Configure the selected profile's terminal launcher. A terminal provider of
+# "none" is a deliberate no-op that preserves Kali's existing launcher.
+print_status "Configuring profile terminal launcher..."
+profile_configure_panel "$PORTALGUN_PROFILE" "$PORTALGUN_TARGET_USER"
 
 # Remove text editor from panel (plugin 5)
 if command -v xfconf-query &>/dev/null; then
@@ -649,7 +559,11 @@ if [ "${PORTALGUN_SKIP_BUNDLE:-0}" != "1" ] && command -v portalgun >/dev/null 2
     #   - register_all + sync_web_manifest at the tail → populates /var/lib + manifest
     # Burp/Sliver still skipped here; they run as explicit Phase 11/12 below.
     PORTALGUN_SKIP_BURP=1 PORTALGUN_SKIP_SLIVER=1 \
-        sudo -E bash -c "source /opt/portalgun/lib/apply.sh && apply_bundle /opt/portalgun/portalgun_bundle.json" 2>&1 | tee -a "$LOG_FILE"
+        sudo -E env PORTALGUN_PROFILE="$PORTALGUN_PROFILE" \
+          PORTALGUN_PROFILE_ROOT="/opt/portalgun/profiles" \
+          PORTALGUN_COMPONENT_ROOT="/opt/portalgun/components" \
+          PORTALGUN_TARGET_USER="$PORTALGUN_TARGET_USER" \
+          bash -c "source /opt/portalgun/lib/apply.sh && apply_bundle /opt/portalgun/portalgun_bundle.json" 2>&1 | tee -a "$LOG_FILE"
     bundle_rc=${PIPESTATUS[0]}
     set -e
     if [ $bundle_rc -eq 0 ]; then
@@ -711,10 +625,8 @@ echo "Installation finished: $(date)"
 echo "Log file: $LOG_FILE"
 echo ""
 echo "Installed components:"
-echo "  [+] Terminal: Kitty, Zsh, Oh-My-Zsh, Tmux, Zellij"
-echo "  [+] Tools: Starship, FZF, Zoxide, Eza, Bat, Ripgrep, Fd"
-echo "  [+] Apps: Yazi, Lazygit, Btop, Neovim, Tealdeer"
-echo "  [+] Fonts: JetBrains Mono Nerd Font"
+profile_summary "$PORTALGUN_PROFILE"
+echo "  [+] Profile helpers: $(jq -r 'if (.helpers // [] | length)==0 then "none" else (.helpers|join(", ")) end' "$(profile_file "$PORTALGUN_PROFILE")")"
 echo "  [+] Libraries: System libraries"
 echo "  [+] Kali Tools: From apt repositories"
 echo "  [+] GitHub Tools: Security tools in /opt/tools"
@@ -724,8 +636,8 @@ echo "  [+] Firefox: profile restored from seed"
 echo "  [+] portalgun: /usr/local/bin/portalgun (try: portalgun doctor)"
 echo ""
 echo "Next steps:"
-echo "  1. Log out and back in (or run: exec zsh)"
-echo "  2. In tmux, press prefix+I to install plugins"
+echo "  1. Log out and back in so login-shell and group changes take effect"
+echo "  2. Verify the profile: portalgun --profile $PORTALGUN_PROFILE profile verify"
 echo "  3. Access tools server at http://$IP:1337"
 echo ""
 
@@ -741,7 +653,7 @@ if command -v portalgun >/dev/null 2>&1; then
     echo "═══════════════════════════════════════════════════════════════════"
     echo -e "  ${CYAN}POST-INSTALL VERIFICATION${NC}"
     echo "═══════════════════════════════════════════════════════════════════"
-    sudo portalgun verify 2>&1 | tee -a "$LOG_FILE"
+    sudo portalgun --profile "$PORTALGUN_PROFILE" verify 2>&1 | tee -a "$LOG_FILE"
 fi
 
 # Debug mode error summary
