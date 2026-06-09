@@ -745,9 +745,15 @@ fi
 
 echo "═══════════════════════════════════════════════════════════════════"
 
-if [ "${VERIFY_RC:-1}" -ne 0 ]; then
-    print_error "Installation completed, but post-install verification failed"
-    exit "$VERIFY_RC"
-fi
-
-print_success "Installation and post-install verification completed successfully"
+case "${VERIFY_RC:-2}" in
+    0)
+        print_success             "Installation and post-install verification completed successfully"
+        ;;
+    1)
+        print_warning             "Installation completed successfully; post-install verification reported warnings"
+        ;;
+    *)
+        print_error             "Installation completed, but post-install verification failed"
+        exit "$VERIFY_RC"
+        ;;
+esac

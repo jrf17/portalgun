@@ -114,6 +114,22 @@ grep -q 'profile_configure_panel' "$ROOT/install.sh" || fail "profile-aware pane
 ! grep -q 'kitty.desktop.*DESKTOP' "$ROOT/install.sh" || true
 pass "install path is profile aware"
 
+grep -Fq 'case "${VERIFY_RC:-2}" in' "$ROOT/install.sh" ||
+    fail "installer does not classify verification exit statuses"
+
+grep -Fq     'Installation completed successfully; post-install verification reported warnings'     "$ROOT/install.sh" ||
+    fail "installer does not accept verification warnings"
+
+grep -Fq     'Installation completed, but post-install verification failed'     "$ROOT/install.sh" ||
+    fail "installer does not preserve hard verification failures"
+
+if grep -Fq     'if [ "${VERIFY_RC:-1}" -ne 0 ]; then'     "$ROOT/install.sh"
+then
+    fail "installer still treats warnings as hard failures"
+fi
+
+pass "installer distinguishes verification warnings from failures"
+
 for f in zshrc tmux.conf kitty.conf starship.toml; do
     case "$f" in
         zshrc) dst="$ROOT/profiles/default/dotfiles/.zshrc" ;;
