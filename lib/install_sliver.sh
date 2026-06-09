@@ -6,7 +6,7 @@ SLIVER_DIR="/opt/portalgun/sliver"
 SLIVER_SERVER_BIN="/usr/local/bin/sliver-server"
 SLIVER_CLIENT_BIN="/usr/local/bin/sliver-client"
 SLIVER_INSTALL_URL="https://sliver.sh/install"
-ARMORY_INDEX_URL="https://armory.sliver.sh/index.json"
+SLIVER_ARMORY_REQUIRED="${PORTALGUN_REQUIRE_SLIVER_ARMORY:-0}"
 
 _sl_log() { printf '\033[0;34m[*]\033[0m %s\n' "$*"; }
 _sl_ok()  { printf '\033[0;32m[+]\033[0m %s\n' "$*"; }
@@ -103,66 +103,23 @@ stage_bundled_armory() {
 #   2. Generate an rc file with one `armory install <pkg>` per line
 #   3. Execute that rc against sliver-server
 preinstall_sliver_armory() {
-    # Try bundled cache first (offline-safe, fast)
     if stage_bundled_armory; then
         _sl_ok "Armory installed offline from bundle"
         return 0
     fi
-    if ! command -v sliver-server >/dev/null 2>&1; then
-        _sl_err "sliver-server not on PATH; skipping armory preload"
+
+    _sl_err         "No bundled Sliver armory cache was found under data/sliver-armory"
+
+    _sl_err         "Full online preload is disabled because the unauthenticated "         "GitHub API limit cannot support the complete armory catalog"
+
+    if [ "${PORTALGUN_REQUIRE_SLIVER_ARMORY:-0}" = "1" ]; then
+        _sl_err             "Sliver armory is required by PORTALGUN_REQUIRE_SLIVER_ARMORY=1"
         return 1
     fi
-    _sl_log "Unpacking sliver assets first"
-    sliver-server unpack --force >> /var/log/portalgun/sliver-armory.log 2>&1 || true
 
-    mkdir -p /root/.sliver-client/armories /root/.sliver-client/configs
+    _sl_log         "Continuing without optional Sliver aliases and extensions"
 
-    # Step 1: enumerate available packages
-    _sl_log "Enumerating armory packages"
-    local list_rc=/tmp/portalgun-sliver-list.rc
-    local list_out=/tmp/portalgun-sliver-list.txt
-    printf 'armory refresh\narmory list\nexit\n' > "$list_rc"
-    timeout 180 sliver-server --rc "$list_rc" 2>&1 | \
-        sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' > "$list_out"
-    rm -f "$list_rc"
-
-    # Parse: rows look like " Default   <name>   v0.0.X   Extension|Alias   ..."
-    # Filter requires col 3 to be a vX.Y.Z and col 4 to be Extension or Alias —
-    # this excludes the Bundles table (which has comma lists in col 3).
-    mapfile -t pkgs < <(awk '
-        /^ +Default[[:space:]]+[A-Za-z0-9_.-]+[[:space:]]+v[0-9]+\.[0-9]+/ {
-            if ($4 == "Extension" || $4 == "Alias") print $2
-        }
-    ' "$list_out" | sort -u | grep -v '^$')
-    rm -f "$list_out"
-
-    if [ "${#pkgs[@]}" -eq 0 ]; then
-        _sl_err "No armory packages enumerated (rc invocation may have failed)"
-        return 1
-    fi
-    _sl_ok "Found ${#pkgs[@]} armory packages — installing each"
-
-    # Step 2: write rc file with one install per package
-    local install_rc=/tmp/portalgun-sliver-install.rc
-    {
-        echo 'armory refresh'
-        for p in "${pkgs[@]}"; do
-            echo "armory install $p"
-        done
-        echo 'exit'
-    } > "$install_rc"
-
-    # Step 3: execute install (one big timeout — 60min for ~200 packages)
-    _sl_log "Installing ${#pkgs[@]} armory packages (this may take 30-60 min)"
-    timeout 3600 sliver-server --rc "$install_rc" \
-        >> /var/log/portalgun/sliver-armory.log 2>&1 \
-        || _sl_err "armory install batch exited non-zero (continuing — partial cache is fine)"
-    rm -f "$install_rc"
-
-    # Sliver caches installed extensions under ~/.sliver-client/extensions/
-    local n=0 ext_dir=/root/.sliver-client/extensions
-    [ -d "$ext_dir" ] && n=$(find "$ext_dir" -maxdepth 1 -mindepth 1 -type d | wc -l)
-    _sl_ok "Armory install finished — $n extensions cached under $ext_dir"
+    return 2
 }
 
 # Copy root's sliver-client state (configs, extensions, armory cache) out to
@@ -184,34 +141,84 @@ stage_armory_for_users() {
 }
 
 register_sliver() {
+    local armory_rc="${1:-2}"
     local reg_dir="/var/lib/portalgun/registry/sliver"
+    local server_path
+    local client_path
+    local armory_status
+
+    server_path=$(command -v sliver-server 2>/dev/null || true)
+    client_path=$(command -v sliver-client 2>/dev/null || true)
+
+    case "$armory_rc" in
+        0)
+            armory_status="staged"
+            ;;
+        1)
+            armory_status="required-failed"
+            ;;
+        *)
+            armory_status="optional-not-staged"
+            ;;
+    esac
+
     mkdir -p "$reg_dir"
-    cat > "$reg_dir/sliver.json" <<EOF
-{
-  "name": "sliver",
-  "type": "sliver",
-  "server": "$SLIVER_SERVER_BIN",
-  "client": "$SLIVER_CLIENT_BIN",
-  "armory_dir": "/root/.sliver-client/armories",
-  "installed_at": "$(date -Iseconds)"
-}
-EOF
+
+    jq -n         --arg server "$server_path"         --arg client "$client_path"         --arg armory_dir "/root/.sliver-client/armories"         --arg armory_status "$armory_status"         --arg installed_at "$(date -Iseconds)"         '{
+            name: "sliver",
+            type: "sliver",
+            server: $server,
+            client: $client,
+            armory_dir: $armory_dir,
+            armory_status: $armory_status,
+            installed_at: $installed_at
+        }' > "$reg_dir/sliver.json"
+
     _sl_ok "Registered → $reg_dir/sliver.json"
 }
 
 install_sliver() {
+    local armory_rc=0
+
     mkdir -p "$SLIVER_DIR" /var/log/portalgun
+
     ensure_sliver_installed || return 1
-    preinstall_sliver_armory
+
+    preinstall_sliver_armory || armory_rc=$?
+
     stage_armory_for_users
-    register_sliver
-    _sl_ok "Sliver install complete. Server: sliver-server | Client: sliver-client"
+    register_sliver "$armory_rc"
+
+    if [ "$armory_rc" -eq 1 ]; then
+        return 1
+    fi
+
+    if [ "$armory_rc" -eq 2 ]; then
+        _sl_log             "Sliver installed without the optional offline armory cache"
+    fi
+
+    _sl_ok         "Sliver install complete. Server: sliver-server | Client: sliver-client"
+
+    return 0
 }
 
 update_sliver() {
-    _sl_log "Updating Sliver and re-running armory install"
+    local armory_rc=0
+
+    _sl_log "Updating Sliver"
+
     sliver_direct_install || return 1
-    preinstall_sliver_armory
+
+    preinstall_sliver_armory || armory_rc=$?
+
     stage_armory_for_users
+    register_sliver "$armory_rc"
+
+    if [ "$armory_rc" -eq 1 ]; then
+        return 1
+    fi
+
     _sl_ok "Sliver updated"
+
+    return 0
 }

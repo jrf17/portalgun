@@ -291,27 +291,80 @@ print('\n'.join(data['tools'].get('cargo', [])))
     command -v sliver-client >/dev/null 2>&1 && \
         { _row "$PASS_MARK" "sliver-client" "$(command -v sliver-client)"; pass=$((pass+1)); } || \
         { _row "$FAIL_MARK" "sliver-client" "missing"; fail=$((fail+1)); }
-    local ext_count=0 alias_count=0
-    [ -d /root/.sliver-client/extensions ] && \
-        ext_count=$(find /root/.sliver-client/extensions -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
-    [ -d /root/.sliver-client/aliases ] && \
-        alias_count=$(find /root/.sliver-client/aliases -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
-    if [ "$ext_count" -ge 140 ]; then
-        _row "$PASS_MARK" "Sliver extensions" "$ext_count staged"
-        pass=$((pass + 1))
-    elif [ "$ext_count" -gt 0 ]; then
-        _row "$WARN_MARK" "Sliver extensions" "$ext_count staged (expected ~152)"
-        warn=$((warn + 1))
-    else
-        _row "$FAIL_MARK" "Sliver extensions" "0 — bundled armory missing"
+    local ext_count=0
+    local alias_count=0
+    local sliver_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-$(id -un)}}"
+    local sliver_home
+    local sliver_ext_dir
+    local sliver_alias_dir
+    local sliver_armory_expected=0
+
+    sliver_home=$(getent passwd "$sliver_user" | cut -d: -f6)
+
+    if [ -z "$sliver_home" ] || [ ! -d "$sliver_home" ]; then
+        _row             "$FAIL_MARK"             "Sliver armory user"             "invalid target user: $sliver_user"
+
         fail=$((fail + 1))
-    fi
-    if [ "$alias_count" -ge 20 ]; then
-        _row "$PASS_MARK" "Sliver aliases" "$alias_count staged"
-        pass=$((pass + 1))
     else
-        _row "$WARN_MARK" "Sliver aliases" "$alias_count staged (expected ~22)"
-        warn=$((warn + 1))
+        sliver_ext_dir="$sliver_home/.sliver-client/extensions"
+        sliver_alias_dir="$sliver_home/.sliver-client/aliases"
+
+        if [ -f "$PORTALGUN_ROOT/data/sliver-armory/armory.json" ] ||
+            [ -f "${PORTALGUN_REPO_DIR:-/nonexistent}/data/sliver-armory/armory.json" ] ||
+            [ "${PORTALGUN_REQUIRE_SLIVER_ARMORY:-0}" = "1" ]
+        then
+            sliver_armory_expected=1
+        fi
+
+        if [ -d "$sliver_ext_dir" ]; then
+            ext_count=$(
+                find "$sliver_ext_dir"                     -maxdepth 1                     -mindepth 1                     -type d 2>/dev/null |
+                wc -l
+            )
+        fi
+
+        if [ -d "$sliver_alias_dir" ]; then
+            alias_count=$(
+                find "$sliver_alias_dir"                     -maxdepth 1                     -mindepth 1                     -type d 2>/dev/null |
+                wc -l
+            )
+        fi
+
+        if [ "$ext_count" -ge 140 ]; then
+            _row                 "$PASS_MARK"                 "Sliver extensions"                 "$ext_count staged for $sliver_user"
+
+            pass=$((pass + 1))
+        elif [ "$ext_count" -gt 0 ]; then
+            _row                 "$WARN_MARK"                 "Sliver extensions"                 "$ext_count staged for $sliver_user (partial cache)"
+
+            warn=$((warn + 1))
+        elif [ "$sliver_armory_expected" -eq 1 ]; then
+            _row                 "$FAIL_MARK"                 "Sliver extensions"                 "required armory cache was not staged"
+
+            fail=$((fail + 1))
+        else
+            _row                 "$WARN_MARK"                 "Sliver extensions"                 "not staged; no bundled armory cache was supplied"
+
+            warn=$((warn + 1))
+        fi
+
+        if [ "$alias_count" -ge 20 ]; then
+            _row                 "$PASS_MARK"                 "Sliver aliases"                 "$alias_count staged for $sliver_user"
+
+            pass=$((pass + 1))
+        elif [ "$alias_count" -gt 0 ]; then
+            _row                 "$WARN_MARK"                 "Sliver aliases"                 "$alias_count staged for $sliver_user (partial cache)"
+
+            warn=$((warn + 1))
+        elif [ "$sliver_armory_expected" -eq 1 ]; then
+            _row                 "$FAIL_MARK"                 "Sliver aliases"                 "required armory cache was not staged"
+
+            fail=$((fail + 1))
+        else
+            _row                 "$WARN_MARK"                 "Sliver aliases"                 "not staged; no bundled armory cache was supplied"
+
+            warn=$((warn + 1))
+        fi
     fi
 
     # ── Burp smoke test ─────────────────────────────────────────────
