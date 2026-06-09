@@ -157,29 +157,86 @@ for g in d['tools']['github']:
 
     # ── cargo crates ────────────────────────────────────────────────
     echo "── cargo crates ──────────────────────────"
-    local cargo_total cargo_installed=0 cargo_missing=0
-    cargo_total=$(python3 -c "import json;d=json.load(open('$bundle'));print(len(d['tools'].get('cargo',[])))")
-    # Crate name ≠ binary name (e.g. cargo-update ships cargo-install-update).
-    # Use `cargo install --list` for the source of truth.
-    local cargo_list
-    cargo_list=$(cargo install --list 2>/dev/null | grep -E '^[a-z]' | awk -F: '{print $1}' | awk '{print $1}' | sort -u)
-    while IFS= read -r crate; do
-        [ -z "$crate" ] && continue
-        if echo "$cargo_list" | grep -qx "$crate" || \
-           [ -x "/root/.cargo/bin/$crate" ] || \
-           command -v "$crate" >/dev/null 2>&1 || \
-           ls /root/.cargo/bin/$crate* >/dev/null 2>&1; then
-            cargo_installed=$((cargo_installed + 1))
-        else
-            cargo_missing=$((cargo_missing + 1))
-        fi
-    done < <(python3 -c "import json;d=json.load(open('$bundle'));print('\n'.join(d['tools'].get('cargo',[])))")
-    if [ "$cargo_missing" -eq 0 ]; then
-        _row "$PASS_MARK" "cargo crates" "$cargo_installed/$cargo_total installed"
-        pass=$((pass + 1))
+
+    local cargo_total
+    local cargo_installed=0
+    local cargo_missing=0
+    local cargo_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-$(id -un)}}"
+    local cargo_home
+    local cargo_path
+    local cargo_list=""
+    local -a cargo_runner
+
+    cargo_total=$(
+        python3 -c "
+import json
+data = json.load(open('$bundle'))
+print(len(data['tools'].get('cargo', [])))
+"
+    )
+
+    cargo_home=$(getent passwd "$cargo_user" | cut -d: -f6)
+
+    if ! id "$cargo_user" >/dev/null 2>&1 ||
+        [ -z "$cargo_home" ] ||
+        [ ! -d "$cargo_home" ]
+    then
+        _row             "$FAIL_MARK"             "cargo crates"             "invalid target user: $cargo_user"
+
+        fail=$((fail + 1))
     else
-        _row "$WARN_MARK" "cargo crates" "$cargo_installed/$cargo_total installed ($cargo_missing missing)"
-        warn=$((warn + 1))
+        cargo_path="$cargo_home/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+        if [ "$(id -un)" = "$cargo_user" ]; then
+            cargo_runner=(
+                env
+                HOME="$cargo_home"
+                USER="$cargo_user"
+                LOGNAME="$cargo_user"
+                PATH="$cargo_path"
+            )
+        else
+            cargo_runner=(
+                sudo -H -u "$cargo_user"
+                env
+                HOME="$cargo_home"
+                USER="$cargo_user"
+                LOGNAME="$cargo_user"
+                PATH="$cargo_path"
+            )
+        fi
+
+        cargo_list=$(
+            "${cargo_runner[@]}"                 cargo install --list 2>/dev/null || true
+        )
+
+        while IFS= read -r crate; do
+            [ -n "$crate" ] || continue
+
+            if printf '%s\n' "$cargo_list" |
+                grep -q "^${crate} "
+            then
+                cargo_installed=$((cargo_installed + 1))
+            else
+                cargo_missing=$((cargo_missing + 1))
+            fi
+        done < <(
+            python3 -c "
+import json
+data = json.load(open('$bundle'))
+print('\n'.join(data['tools'].get('cargo', [])))
+"
+        )
+
+        if [ "$cargo_missing" -eq 0 ]; then
+            _row                 "$PASS_MARK"                 "cargo crates"                 "$cargo_installed/$cargo_total installed for $cargo_user"
+
+            pass=$((pass + 1))
+        else
+            _row                 "$WARN_MARK"                 "cargo crates"                 "$cargo_installed/$cargo_total installed for $cargo_user ($cargo_missing missing)"
+
+            warn=$((warn + 1))
+        fi
     fi
 
     # ── Burp Suite Pro ───────────────────────────────────────────────

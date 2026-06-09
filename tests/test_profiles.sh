@@ -87,6 +87,22 @@ grep -Fq     'apt_profile_excluded=$((apt_profile_excluded + 1))'     "$ROOT/lib
 grep -Fq     'local apt_already=$((apt_count - apt_total - apt_profile_excluded))'     "$ROOT/lib/apply.sh" ||
     fail "apply APT summary is not arithmetic expansion"
 
+grep -Fq     'local cargo_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-$(id -un)}}"'     "$ROOT/lib/apply.sh" ||
+    fail "cargo installation is not target-user aware"
+
+grep -Fq     'local cargo_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-$(id -un)}}"'     "$ROOT/lib/verify.sh" ||
+    fail "cargo verification is not target-user aware"
+
+grep -Fq     'sudo -H -u "$cargo_user"'     "$ROOT/lib/apply.sh" ||
+    fail "cargo installation does not switch to the target user"
+
+grep -Fq     'sudo -H -u "$cargo_user"'     "$ROOT/lib/verify.sh" ||
+    fail "cargo verification does not switch to the target user"
+
+if grep -Fq '/root/.cargo/bin' "$ROOT/lib/verify.sh"; then
+    fail "cargo verification still contains root-only paths"
+fi
+
 pass "bundle APT packages respect selected profile"
 
 grep -q 'profile_apply "$active_profile"' "$ROOT/lib/apply.sh" || fail "bundle replay profile integration"

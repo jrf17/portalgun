@@ -320,49 +320,152 @@ apply_bundle() {
         _progress 96 "Phase 4: Installing cargo tools..."
         print_status "Phase 4: cargo packages ($cargo_count)"
 
-        if ! command -v cargo >/dev/null 2>&1; then
-            print_warning "cargo not found — skipping cargo phase"
+        local cargo_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-$(id -un)}}"
+        local cargo_home
+        local cargo_path
+        local -a cargo_runner
+
+        cargo_home=$(getent passwd "$cargo_user" | cut -d: -f6)
+
+        if ! id "$cargo_user" >/dev/null 2>&1 ||
+            [ -z "$cargo_home" ] ||
+            [ ! -d "$cargo_home" ]
+        then
+            print_warning                 "Cargo target user is invalid or has no home: $cargo_user"
         else
-            local cargo_ok=0 cargo_skip=0 cargo_fail=0 cargo_done=0
+            cargo_path="$cargo_home/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-            while IFS= read -r pkg_name; do
-                [ -z "$pkg_name" ] && continue
-                cargo_done=$(( cargo_done + 1 ))
-                local safe_id
-                safe_id=$(echo "$pkg_name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '_')
-                local pct=$(( 96 + ( cargo_done * 3 / cargo_count ) ))
-                _progress "$pct" "Phase 4: cargo [$cargo_done/$cargo_count] $pkg_name"
+            if [ "$(id -un)" = "$cargo_user" ]; then
+                cargo_runner=(
+                    env
+                    HOME="$cargo_home"
+                    USER="$cargo_user"
+                    LOGNAME="$cargo_user"
+                    PATH="$cargo_path"
+                )
+            else
+                cargo_runner=(
+                    sudo -H -u "$cargo_user"
+                    env
+                    HOME="$cargo_home"
+                    USER="$cargo_user"
+                    LOGNAME="$cargo_user"
+                    PATH="$cargo_path"
+                )
+            fi
 
-                if registry_exists cargo "$safe_id"; then
-                    printf "  ${CYAN}[skip]${NC} %s\n" "$pkg_name"
-                    (( cargo_skip++ )) || true
-                    continue
-                fi
+            if ! "${cargo_runner[@]}" cargo --version >/dev/null 2>&1; then
+                print_warning                     "cargo is unavailable for target user '$cargo_user'"
+            else
+                local cargo_ok=0
+                local cargo_skip=0
+                local cargo_fail=0
+                local cargo_done=0
 
-                printf "  ${BLUE}[cargo]${NC} %s ... " "$pkg_name"
-                if cargo install "$pkg_name" --quiet 2>/dev/null; then
+                while IFS= read -r pkg_name; do
+                    [ -n "$pkg_name" ] || continue
+
+                    cargo_done=$((cargo_done + 1))
+
+                    local safe_id
+                    local pct
+                    local cargo_list
                     local ver
-                    ver=$(cargo install --list 2>/dev/null | grep "^${pkg_name} " | head -1 | sed 's/.* v//;s/:.*//')
                     local json
-                    json=$(jq -n \
-                        --arg name    "$pkg_name" \
-                        --arg package "$pkg_name" \
-                        --arg version "$ver" \
-                        --arg added   "$(date -Iseconds)" \
-                        '{name:$name,type:"cargo",package:$package,version:$version,status:"ok",added:$added}')
-                    registry_write cargo "$safe_id" "$json"
-                    printf "${GREEN}ok${NC}\n"
-                    (( cargo_ok++ )) || true
-                else
-                    printf "${RED}FAILED${NC}\n"
-                    (( cargo_fail++ )) || true
-                fi
-            done < <(jq -r '(.tools.cargo // [])[]' "$bundle_file")
 
-            echo ""
-            print_status "cargo: $cargo_ok installed, $cargo_skip skipped, $cargo_fail failed"
+                    safe_id=$(
+                        echo "$pkg_name" |
+                        tr '[:upper:]' '[:lower:]' |
+                        tr -cs 'a-z0-9._-' '_'
+                    )
+
+                    pct=$((96 + (cargo_done * 3 / cargo_count)))
+
+                    _progress                         "$pct"                         "Phase 4: cargo [$cargo_done/$cargo_count] $pkg_name"
+
+                    cargo_list=$(
+                        "${cargo_runner[@]}"                             cargo install --list 2>/dev/null || true
+                    )
+
+                    if registry_exists cargo "$safe_id"; then
+                        printf "  ${CYAN}[skip]${NC} %s\n" "$pkg_name"
+                        cargo_skip=$((cargo_skip + 1))
+                        continue
+                    fi
+
+                    if printf '%s\n' "$cargo_list" |
+                        grep -q "^${pkg_name} "
+                    then
+                        ver=$(
+                            printf '%s\n' "$cargo_list" |
+                            grep "^${pkg_name} " |
+                            head -n 1 |
+                            sed -E 's/^[^ ]+ v([^:]+):$/\1/'
+                        )
+
+                        json=$(
+                            jq -n                                 --arg name "$pkg_name"                                 --arg package "$pkg_name"                                 --arg version "$ver"                                 --arg added "$(date -Iseconds)"                                 '{
+                                    name: $name,
+                                    type: "cargo",
+                                    package: $package,
+                                    version: $version,
+                                    status: "ok",
+                                    added: $added
+                                }'
+                        )
+
+                        registry_write cargo "$safe_id" "$json"
+
+                        printf                             "  ${CYAN}[skip]${NC} %s already installed for %s\n"                             "$pkg_name"                             "$cargo_user"
+
+                        cargo_skip=$((cargo_skip + 1))
+                        continue
+                    fi
+
+                    printf "  ${BLUE}[cargo]${NC} %s ... " "$pkg_name"
+
+                    if "${cargo_runner[@]}"                         cargo install "$pkg_name" --quiet
+                    then
+                        cargo_list=$(
+                            "${cargo_runner[@]}"                                 cargo install --list 2>/dev/null || true
+                        )
+
+                        ver=$(
+                            printf '%s\n' "$cargo_list" |
+                            grep "^${pkg_name} " |
+                            head -n 1 |
+                            sed -E 's/^[^ ]+ v([^:]+):$/\1/'
+                        )
+
+                        json=$(
+                            jq -n                                 --arg name "$pkg_name"                                 --arg package "$pkg_name"                                 --arg version "$ver"                                 --arg added "$(date -Iseconds)"                                 '{
+                                    name: $name,
+                                    type: "cargo",
+                                    package: $package,
+                                    version: $version,
+                                    status: "ok",
+                                    added: $added
+                                }'
+                        )
+
+                        registry_write cargo "$safe_id" "$json"
+
+                        printf "${GREEN}ok${NC}\n"
+                        cargo_ok=$((cargo_ok + 1))
+                    else
+                        printf "${RED}FAILED${NC}\n"
+                        cargo_fail=$((cargo_fail + 1))
+                    fi
+                done < <(
+                    jq -r '(.tools.cargo // [])[]' "$bundle_file"
+                )
+
+                echo
+                print_status                     "cargo: $cargo_ok installed, "                     "$cargo_skip skipped, "                     "$cargo_fail failed for $cargo_user"
+            fi
         fi
-        echo ""
+
+        echo
     fi
 
     # ── Phase 5: profile-aware terminal environment + dotfiles ─────
