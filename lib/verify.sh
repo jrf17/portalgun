@@ -25,28 +25,65 @@ verify_install() {
     echo "── APT packages ──────────────────────────"
     local apt_list
     apt_list=$(python3 -c "import json;d=json.load(open('$bundle'));print('\n'.join(d['tools']['apt']))")
-    local apt_total apt_installed apt_missing
-    apt_total=$(echo "$apt_list" | wc -l)
-    apt_installed=0; apt_missing=0
-    # Some bundle entries (zoxide, starship, lazygit, atuin, etc.) are
-    # technically apt-installable but install.sh stages them via direct
-    # binary download. Treat "binary present in /usr/local/bin or ~/.local/bin"
-    # as installed even if dpkg doesn't know about it.
+    local apt_total=0
+    local apt_installed=0
+    local apt_missing=0
+    local apt_profile_excluded=0
+    local apt_profile_decision=0
+    local active_profile="${PORTALGUN_PROFILE:-$(profile_resolve_name)}"
+
+    # Some bundle entries are installed through direct binary downloads.
+    # Treat an available command or binary as installed even if dpkg does
+    # not know about it.
     while IFS= read -r pkg; do
-        if dpkg -s "$pkg" >/dev/null 2>&1 \
-           || command -v "$pkg" >/dev/null 2>&1 \
-           || [ -x "/usr/local/bin/$pkg" ] \
-           || [ -x "/root/.local/bin/$pkg" ]; then
+        [ -n "$pkg" ] || continue
+
+        if declare -F profile_allows_apt_package >/dev/null 2>&1; then
+            if profile_allows_apt_package "$pkg" "$active_profile"; then
+                :
+            else
+                apt_profile_decision=$?
+
+                case "$apt_profile_decision" in
+                    1)
+                        apt_profile_excluded=$((apt_profile_excluded + 1))
+                        continue
+                        ;;
+                    *)
+                        _row                             "$FAIL_MARK"                             "apt packages"                             "profile filter failed for '$active_profile'"
+
+                        fail=$((fail + 1))
+                        return "$apt_profile_decision"
+                        ;;
+                esac
+            fi
+        fi
+
+        apt_total=$((apt_total + 1))
+
+        if dpkg -s "$pkg" >/dev/null 2>&1 ||
+            command -v "$pkg" >/dev/null 2>&1 ||
+            [ -x "/usr/local/bin/$pkg" ] ||
+            [ -x "/root/.local/bin/$pkg" ]
+        then
             apt_installed=$((apt_installed + 1))
         else
             apt_missing=$((apt_missing + 1))
         fi
     done <<< "$apt_list"
+
+    local apt_detail="$apt_installed/$apt_total required installed"
+
+    if [ "$apt_profile_excluded" -gt 0 ]; then
+        apt_detail="$apt_detail ($apt_profile_excluded profile-excluded)"
+    fi
+
     if [ "$apt_missing" -eq 0 ]; then
-        _row "$PASS_MARK" "apt packages" "$apt_installed/$apt_total installed"
+        _row "$PASS_MARK" "apt packages" "$apt_detail"
         pass=$((pass + 1))
     else
-        _row "$WARN_MARK" "apt packages" "$apt_installed/$apt_total installed ($apt_missing missing)"
+        _row             "$WARN_MARK"             "apt packages"             "$apt_detail, $apt_missing missing"
+
         warn=$((warn + 1))
     fi
 

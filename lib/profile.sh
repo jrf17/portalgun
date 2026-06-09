@@ -186,6 +186,49 @@ profile_resolve_name() {
     printf '%s\n' default
 }
 
+# Return success when an APT package is compatible with the selected
+# terminal profile. Packages unrelated to terminal profiles are always
+# permitted. This filters installation only; it never removes packages
+# that were already present in the Kali baseline.
+profile_allows_apt_package() {
+    local package="${1:-}"
+    local name="${2:-$(profile_resolve_name)}"
+    local file terminal shell
+
+    [ -n "$package" ] || return 64
+
+    file="$(profile_file "$name")"
+
+    if [ ! -f "$file" ]; then
+        print_error "Profile not found while filtering APT package '$package': $name"
+        return 2
+    fi
+
+    terminal=$(jq -r '.terminal.provider // "none"' "$file") ||
+        return 2
+
+    shell=$(jq -r '.shell.provider // "none"' "$file") ||
+        return 2
+
+    case "$package" in
+        kitty|ghostty|tilix|alacritty)
+            [ "$package" = "$terminal" ]
+            ;;
+
+        tmux|zellij)
+            jq -e --arg package "$package"                 '(.multiplexers // []) | index($package) != null'                 "$file" >/dev/null
+            ;;
+
+        zsh|bash|fish)
+            [ "$package" = "$shell" ]
+            ;;
+
+        *)
+            return 0
+            ;;
+    esac
+}
+
 _profile_run_as() {
     local user="$1"; shift
     local home

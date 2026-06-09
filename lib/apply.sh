@@ -93,21 +93,50 @@ apply_bundle() {
         print_status "Phase 1: apt packages ($apt_count)"
 
         local apt_needed=()
+        local apt_profile_excluded=0
+        local apt_profile_decision=0
+        local active_profile="${PORTALGUN_PROFILE:-$(profile_resolve_name)}"
+
         while IFS= read -r pkg; do
             [ -z "$pkg" ] && continue
-            # Skip if either the registry knows about it OR dpkg shows it
-            # installed system-wide. Falling back to dpkg keeps idempotency
-            # honest when apt was driven by install.sh's legacy path (which
-            # doesn't touch the registry) or by manual sysadmin work.
-            if registry_exists apt "$pkg" || dpkg -s "$pkg" >/dev/null 2>&1; then
+
+            if declare -F profile_allows_apt_package >/dev/null 2>&1; then
+                if profile_allows_apt_package "$pkg" "$active_profile"; then
+                    :
+                else
+                    apt_profile_decision=$?
+
+                    case "$apt_profile_decision" in
+                        1)
+                            print_status "  [profile-skip] $pkg"
+                            apt_profile_excluded=$((apt_profile_excluded + 1))
+                            continue
+                            ;;
+                        *)
+                            print_error                                 "Unable to evaluate APT package '$pkg' for profile '$active_profile'"
+                            return "$apt_profile_decision"
+                            ;;
+                    esac
+                fi
+            fi
+
+            # Skip if either the registry knows about it or dpkg shows it
+            # installed system-wide.
+            if registry_exists apt "$pkg" ||
+                dpkg -s "$pkg" >/dev/null 2>&1
+            then
                 continue
             fi
+
             apt_needed+=("$pkg")
         done < <(jq -r '.tools.apt[]' "$bundle_file")
 
-        local apt_skip=$(( apt_count - ${#apt_needed[@]} ))
         local apt_total=${#apt_needed[@]}
-        print_status "  $apt_skip already installed, $apt_total to install"
+        local apt_already=$((apt_count - apt_total - apt_profile_excluded))
+
+        [ "$apt_already" -ge 0 ] || apt_already=0
+
+        print_status             "$apt_already already installed, "             "$apt_profile_excluded excluded by profile, "             "$apt_total to install"
 
         if [ "$apt_total" -gt 0 ]; then
             _progress 2 "Phase 1: Downloading apt packages ($apt_total)..."

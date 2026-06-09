@@ -27,6 +27,68 @@ pass "starter profiles validate"
 [ "$(jq -r '.dotfiles.strategy' "$ROOT/profiles/kali-default/profile.json")" = none ] || fail "kali-default dotfiles"
 pass "kali-default is a true no-op"
 
+profile_allows_apt_package ghostty joseph ||
+    fail "joseph must allow ghostty"
+
+profile_allows_apt_package zellij joseph ||
+    fail "joseph must allow zellij"
+
+profile_allows_apt_package zsh joseph ||
+    fail "joseph must allow zsh"
+
+! profile_allows_apt_package kitty joseph ||
+    fail "joseph must exclude kitty"
+
+! profile_allows_apt_package tmux joseph ||
+    fail "joseph must exclude tmux"
+
+profile_allows_apt_package kitty default ||
+    fail "default must allow kitty"
+
+profile_allows_apt_package tmux default ||
+    fail "default must allow tmux"
+
+profile_allows_apt_package zellij default ||
+    fail "default must allow zellij"
+
+! profile_allows_apt_package kitty kali-default ||
+    fail "kali-default must exclude kitty"
+
+! profile_allows_apt_package tmux kali-default ||
+    fail "kali-default must exclude tmux"
+
+! profile_allows_apt_package zsh kali-default ||
+    fail "kali-default must exclude zsh"
+
+grep -q 'profile_allows_apt_package' "$ROOT/lib/apply.sh" ||
+    fail "bundle APT phase does not use profile filter"
+
+grep -q 'profile_allows_apt_package' "$ROOT/lib/verify.sh" ||
+    fail "verifier does not use profile filter"
+
+grep -q 'source /opt/portalgun/lib/profile.sh' "$ROOT/install.sh" ||
+    fail "bundle replay does not load profile engine"
+
+set +e
+profile_allows_apt_package     kitty     profile-that-does-not-exist     >/dev/null 2>&1
+
+invalid_profile_rc=$?
+set -e
+
+[ "$invalid_profile_rc" -eq 2 ] ||
+    fail "invalid profile must return status 2"
+
+grep -Fq     'apt_profile_excluded=$((apt_profile_excluded + 1))'     "$ROOT/lib/apply.sh" ||
+    fail "apply APT exclusion counter is not arithmetic expansion"
+
+grep -Fq     'apt_profile_excluded=$((apt_profile_excluded + 1))'     "$ROOT/lib/verify.sh" ||
+    fail "verify APT exclusion counter is not arithmetic expansion"
+
+grep -Fq     'local apt_already=$((apt_count - apt_total - apt_profile_excluded))'     "$ROOT/lib/apply.sh" ||
+    fail "apply APT summary is not arithmetic expansion"
+
+pass "bundle APT packages respect selected profile"
+
 grep -q 'profile_apply "$active_profile"' "$ROOT/lib/apply.sh" || fail "bundle replay profile integration"
 ! grep -q '_apply_dotfiles_for_user' "$ROOT/lib/apply.sh" || fail "legacy hard-coded dotfile function remains"
 ! grep -q 'p3ta default config' "$ROOT/lib/apply.sh" || fail "legacy p3ta phase remains"
