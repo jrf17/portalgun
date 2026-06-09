@@ -262,19 +262,113 @@ print('\n'.join(data['tools'].get('cargo', [])))
         _row "$FAIL_MARK" "Burp launcher" "missing"
         fail=$((fail + 1))
     fi
-    local bapp_count=0
-    [ -d /opt/portalgun/burpsuite/bapps ] && \
-        bapp_count=$(find /opt/portalgun/burpsuite/bapps -maxdepth 1 -mindepth 1 -type d | wc -l)
-    if [ "$bapp_count" -ge 450 ]; then
-        _row "$PASS_MARK" "BApps cached" "$bapp_count entries"
-        pass=$((pass + 1))
-    elif [ "$bapp_count" -gt 0 ]; then
-        _row "$WARN_MARK" "BApps cached" "$bapp_count entries (expected ~499)"
-        warn=$((warn + 1))
-    else
-        _row "$FAIL_MARK" "BApps cached" "0 — bundle preload failed"
+    local bapp_manifest="/opt/portalgun/burpsuite/bapps/manifest.json"
+    local bapp_require="${PORTALGUN_REQUIRE_BAPP_CACHE:-0}"
+
+    if [ -f "$bapp_manifest" ] &&
+        jq -e . "$bapp_manifest" >/dev/null 2>&1
+    then
+        local bapp_mode
+        local bapp_official
+        local bapp_cached
+        local bapp_failures
+        local bapp_actual
+
+        bapp_mode=$(jq -r '.mode // "unknown"' "$bapp_manifest")
+        bapp_official=$(jq -r '.summary.official_ids // 0' "$bapp_manifest")
+        bapp_cached=$(jq -r '.summary.packages_cached // 0' "$bapp_manifest")
+        bapp_failures=$(jq -r '.summary.failures // 0' "$bapp_manifest")
+
+        bapp_actual=$(
+            find /opt/portalgun/burpsuite/bapps/packages \
+                -type f \
+                -name '*.bapp' \
+                2>/dev/null |
+            wc -l
+        )
+
+        case "$bapp_mode" in
+            official)
+                if [ "$bapp_official" -gt 0 ] &&
+                    [ "$bapp_cached" -eq "$bapp_official" ] &&
+                    [ "$bapp_actual" -eq "$bapp_cached" ] &&
+                    [ "$bapp_failures" -eq 0 ]
+                then
+                    _row \
+                        "$PASS_MARK" \
+                        "Official BApp cache" \
+                        "$bapp_cached/$bapp_official official packages cached"
+
+                    pass=$((pass + 1))
+                elif [ "$bapp_require" = "1" ]; then
+                    _row \
+                        "$FAIL_MARK" \
+                        "Official BApp cache" \
+                        "$bapp_actual files; manifest=$bapp_cached/$bapp_official, failures=$bapp_failures"
+
+                    fail=$((fail + 1))
+                else
+                    _row \
+                        "$WARN_MARK" \
+                        "Official BApp cache" \
+                        "$bapp_actual files; manifest=$bapp_cached/$bapp_official, failures=$bapp_failures"
+
+                    warn=$((warn + 1))
+                fi
+                ;;
+
+            metadata)
+                _row \
+                    "$PASS_MARK" \
+                    "Official BApp cache" \
+                    "$bapp_official metadata records; packages disabled by policy"
+
+                pass=$((pass + 1))
+                ;;
+
+            off)
+                _row \
+                    "$PASS_MARK" \
+                    "Official BApp cache" \
+                    "disabled by policy"
+
+                pass=$((pass + 1))
+                ;;
+
+            *)
+                if [ "$bapp_require" = "1" ]; then
+                    _row \
+                        "$FAIL_MARK" \
+                        "Official BApp cache" \
+                        "invalid manifest mode: $bapp_mode"
+
+                    fail=$((fail + 1))
+                else
+                    _row \
+                        "$WARN_MARK" \
+                        "Official BApp cache" \
+                        "invalid manifest mode: $bapp_mode"
+
+                    warn=$((warn + 1))
+                fi
+                ;;
+        esac
+    elif [ "$bapp_require" = "1" ]; then
+        _row \
+            "$FAIL_MARK" \
+            "Official BApp cache" \
+            "required manifest is missing or invalid"
+
         fail=$((fail + 1))
+    else
+        _row \
+            "$WARN_MARK" \
+            "Official BApp cache" \
+            "manifest missing; official packages were not cached"
+
+        warn=$((warn + 1))
     fi
+
     if [ -f /opt/portalgun/burpsuite/license-import/prefs.xml ]; then
         _row "$PASS_MARK" "License imported" "license-import/prefs.xml present"
         pass=$((pass + 1))
