@@ -643,17 +643,34 @@ fi
 # PHASE 12: Sliver C2 + armory preload
 # Skip with PORTALGUN_SKIP_SLIVER=1
 # ───────────────────────────────────────────────────────────────────
+SLIVER_PHASE_RC=0
+
 if [ "${PORTALGUN_SKIP_SLIVER:-0}" != "1" ]; then
     echo ""
     echo "═══════════════════════════════════════════════════════════════════"
     echo -e "  ${CYAN}PHASE 12/12: Sliver C2 + Armory${NC}                         [96%]"
     echo "═══════════════════════════════════════════════════════════════════"
+
     set +e
-    sudo bash -c "source /opt/portalgun/lib/install_sliver.sh && install_sliver" 2>&1 | tee -a "$LOG_FILE"
+    sudo env \
+        PORTALGUN_TARGET_USER="$PORTALGUN_TARGET_USER" \
+        PORTALGUN_SLIVER_ARMORY_MODE="${PORTALGUN_SLIVER_ARMORY_MODE:-official}" \
+        PORTALGUN_REQUIRE_SLIVER_ARMORY="${PORTALGUN_REQUIRE_SLIVER_ARMORY:-0}" \
+        PORTALGUN_SLIVER_ARMORY_WORKERS="${PORTALGUN_SLIVER_ARMORY_WORKERS:-4}" \
+        PORTALGUN_SLIVER_ARMORY_PRESEED="${PORTALGUN_SLIVER_ARMORY_PRESEED:-}" \
+        bash -c 'source /opt/portalgun/lib/install_sliver.sh && install_sliver' \
+        2>&1 | tee -a "$LOG_FILE"
+
     sliver_rc=${PIPESTATUS[0]}
     set -e
-    [ $sliver_rc -eq 0 ] && print_success "Sliver installed" \
-        || print_warning "Sliver install non-fatal failure (see $LOG_FILE)"
+
+    SLIVER_PHASE_RC="$sliver_rc"
+
+    if [ "$sliver_rc" -eq 0 ]; then
+        print_success "Sliver environment provisioned"
+    else
+        print_error "Required Sliver provisioning failed (see $LOG_FILE)"
+    fi
 else
     print_status "Sliver install SKIPPED (PORTALGUN_SKIP_SLIVER=1)"
 fi
@@ -744,6 +761,12 @@ if [ "$DEBUG_MODE" = true ]; then
 fi
 
 echo "═══════════════════════════════════════════════════════════════════"
+
+if [ "${SLIVER_PHASE_RC:-0}" -ne 0 ] &&
+    [ "${VERIFY_RC:-0}" -lt 2 ]
+then
+    VERIFY_RC=2
+fi
 
 case "${VERIFY_RC:-2}" in
     0)
