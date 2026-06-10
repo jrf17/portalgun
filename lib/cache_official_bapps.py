@@ -175,6 +175,16 @@ def parse_store_ids(source: str) -> list[str]:
     )
 
 
+def normalize_archive_path(value: str) -> str:
+    """Normalize harmless ZIP-relative ./ prefixes without masking traversal."""
+    normalized = value.replace("\\\\", "/")
+
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+
+    return normalized
+
+
 def parse_manifest(data: bytes) -> dict[str, str]:
     values: dict[str, str] = {}
 
@@ -203,7 +213,31 @@ def validate_bapp(
 
     try:
         with zipfile.ZipFile(path) as archive:
-            names = set(archive.namelist())
+            # Preserve the real ZIP member name for archive.read(), while
+            # using a normalized form for validation. Official BApps may
+            # harmlessly prefix members with "./".
+            member_names: dict[str, str] = {}
+
+            for original_name in archive.namelist():
+                normalized_name = normalize_archive_path(original_name)
+
+                if not normalized_name:
+                    continue
+
+                existing_name = member_names.get(normalized_name)
+
+                if (
+                    existing_name is not None
+                    and existing_name != original_name
+                ):
+                    raise ValueError(
+                        "archive contains ambiguous normalized members: "
+                        f"{existing_name!r} and {original_name!r}"
+                    )
+
+                member_names[normalized_name] = original_name
+
+            names = set(member_names)
 
             required = {
                 "BappManifest.bmf",
@@ -219,7 +253,9 @@ def validate_bapp(
                 )
 
             manifest = parse_manifest(
-                archive.read("BappManifest.bmf")
+                archive.read(
+                    member_names["BappManifest.bmf"]
+                )
             )
 
             package_uuid = manifest.get("Uuid")
@@ -236,7 +272,10 @@ def validate_bapp(
 
             entry_point = manifest.get("EntryPoint")
 
-            if entry_point and entry_point not in names:
+            if (
+                entry_point
+                and normalize_archive_path(entry_point) not in names
+            ):
                 raise ValueError(
                     f"manifest entry point is absent: {entry_point}"
                 )

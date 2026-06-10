@@ -118,6 +118,28 @@ parsed = module.validate_bapp(package, uuid)
 assert parsed["Name"] == "Synthetic Test Extension"
 assert parsed["EntryPoint"] == "build/test.jar"
 
+prefixed_package = tmp_dir / "synthetic-prefixed-entrypoint.bapp"
+
+prefixed_manifest = "\n".join(
+    [
+        f"Uuid: {uuid}",
+        "Name: Synthetic Prefixed Extension",
+        "EntryPoint: ./build/prefixed.jar",
+        "SerialVersion: 2",
+        "",
+    ]
+)
+
+with zipfile.ZipFile(prefixed_package, "w") as archive:
+    archive.writestr("./BappManifest.bmf", prefixed_manifest)
+    archive.writestr("./BappSignature.sig", b"test-signature")
+    archive.writestr("build/prefixed.jar", b"test-jar")
+
+prefixed = module.validate_bapp(prefixed_package, uuid)
+
+assert prefixed["Name"] == "Synthetic Prefixed Extension"
+assert prefixed["EntryPoint"] == "./build/prefixed.jar"
+
 version_dir = tmp_dir / "serial-pruning"
 version_dir.mkdir()
 
