@@ -9,7 +9,8 @@ for file in \
     "$ROOT/installers/portalgun_install.sh" \
     "$ROOT/lib/doctor.sh" \
     "$ROOT/lib/install_p3ta_tricks.sh" \
-    "$ROOT/lib/sync_web.sh"
+    "$ROOT/lib/sync_web.sh" \
+    "$ROOT/tests/validate_p3ta_tricks_live.sh"
 do
     bash -n "$file" || fail "bash syntax: $file"
 done
@@ -37,4 +38,6 @@ pass "p3ta-tricks service integration"
 grep -Fq 'portalgun-p3ta-tricks.service' "$ROOT/lib/sync_web.sh" || fail "web synchronization does not refresh p3ta-tricks"
 grep -Fq 'p3ta-tricks:' "$ROOT/lib/doctor.sh" || fail "doctor does not report p3ta-tricks"
 [ -s "$ROOT/docs/P3TA_TRICKS.md" ] || fail "component documentation is missing"
-pass "p3ta-tricks refresh diagnostics and documentation"
+grep -Fq -- '--offline-check' "$ROOT/tests/validate_p3ta_tricks_live.sh" || fail "offline acceptance gate is missing"
+grep -Fq -- '--restart-check' "$ROOT/tests/validate_p3ta_tricks_live.sh" || fail "restart acceptance gate is missing"
+pass "p3ta-tricks refresh diagnostics documentation and live acceptance"
