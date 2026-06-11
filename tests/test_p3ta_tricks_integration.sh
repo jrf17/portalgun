@@ -6,7 +6,6 @@ pass() { echo "[PASS] $*"; }
 
 for file in \
     "$ROOT/bin/portalgun" \
-    "$ROOT/completion/_portalgun" \
     "$ROOT/installers/portalgun_install.sh" \
     "$ROOT/lib/doctor.sh" \
     "$ROOT/lib/install_p3ta_tricks.sh" \
@@ -14,6 +13,8 @@ for file in \
 do
     bash -n "$file" || fail "bash syntax: $file"
 done
+command -v zsh >/dev/null 2>&1 || fail "zsh is required for completion validation"
+zsh -n "$ROOT/completion/_portalgun" || fail "zsh syntax: completion/_portalgun"
 pass "p3ta-tricks shell syntax"
 
 grep -Fq 'install p3ta-tricks' "$ROOT/bin/portalgun" || fail "CLI help is missing"
