@@ -167,7 +167,9 @@ PY
     chmod -R a+rX,u+w,go-w "$stage_root"
 }
 
-_p3ta_unit_path() { printf '%s/%s' "$PORTALGUN_P3TA_TRICKS_SYSTEMD_DIR" "$PORTALGUN_P3TA_TRICKS_SERVICE"; }
+_p3ta_unit_path() {
+    printf '%s/%s' "$PORTALGUN_P3TA_TRICKS_SYSTEMD_DIR" "$PORTALGUN_P3TA_TRICKS_SERVICE"
+}
 
 _p3ta_install_service_unit() {
     local unit_path temporary
@@ -312,6 +314,7 @@ install_p3ta_tricks() (
     local parent_root previous_root stage_root unit_path
     local unit_backup="" launcher_backup=""
     local previous_install=0 tree_activated=0 committed=0
+    local unit_touched=0 launcher_touched=0
     parent_root=$(dirname "$PORTALGUN_P3TA_TRICKS_ROOT")
     previous_root="${PORTALGUN_P3TA_TRICKS_ROOT}.previous"
     unit_path=$(_p3ta_unit_path)
@@ -323,31 +326,37 @@ install_p3ta_tricks() (
         [ -z "$stage_root" ] || rm -rf -- "$stage_root"
 
         if [ "$committed" -ne 1 ]; then
-            systemctl stop "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
             if [ "$tree_activated" -eq 1 ]; then
+                systemctl stop "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
                 rm -rf -- "$PORTALGUN_P3TA_TRICKS_ROOT"
                 if [ "$previous_install" -eq 1 ] && [ -d "$previous_root" ]; then
                     mv "$previous_root" "$PORTALGUN_P3TA_TRICKS_ROOT"
                 fi
             fi
 
-            if [ -n "$unit_backup" ] && [ -f "$unit_backup" ]; then
-                mv -f "$unit_backup" "$unit_path"
-            else
-                rm -f "$unit_path"
+            if [ "$unit_touched" -eq 1 ]; then
+                if [ -n "$unit_backup" ] && [ -f "$unit_backup" ]; then
+                    mv -f "$unit_backup" "$unit_path"
+                else
+                    rm -f "$unit_path"
+                fi
             fi
-            if [ -n "$launcher_backup" ] && [ -f "$launcher_backup" ]; then
-                mv -f "$launcher_backup" "$PORTALGUN_P3TA_TRICKS_LAUNCHER"
-            else
-                rm -f "$PORTALGUN_P3TA_TRICKS_LAUNCHER"
+            if [ "$launcher_touched" -eq 1 ]; then
+                if [ -n "$launcher_backup" ] && [ -f "$launcher_backup" ]; then
+                    mv -f "$launcher_backup" "$PORTALGUN_P3TA_TRICKS_LAUNCHER"
+                else
+                    rm -f "$PORTALGUN_P3TA_TRICKS_LAUNCHER"
+                fi
             fi
 
-            systemctl daemon-reload >/dev/null 2>&1 || true
-            if [ "$previous_install" -eq 1 ]; then
-                systemctl enable "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
-                systemctl restart "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
-            else
-                systemctl disable "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
+            if [ "$unit_touched" -eq 1 ] || [ "$tree_activated" -eq 1 ]; then
+                systemctl daemon-reload >/dev/null 2>&1 || true
+                if [ "$previous_install" -eq 1 ]; then
+                    systemctl enable "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
+                    systemctl restart "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
+                elif [ "$tree_activated" -eq 1 ]; then
+                    systemctl disable "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
+                fi
             fi
         else
             rm -rf -- "$previous_root"
@@ -368,7 +377,9 @@ install_p3ta_tricks() (
         cp -a "$PORTALGUN_P3TA_TRICKS_LAUNCHER" "$launcher_backup"
     fi
 
+    unit_touched=1
     _p3ta_install_service_unit
+    launcher_touched=1
     _p3ta_install_launcher
     systemctl stop "$PORTALGUN_P3TA_TRICKS_SERVICE" >/dev/null 2>&1 || true
     rm -rf -- "$previous_root"
