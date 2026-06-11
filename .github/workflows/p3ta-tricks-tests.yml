@@ -29,22 +29,6 @@ jobs:
       - name: Run policy tests
         run: bash tests/test_p3ta_tricks_policy.sh
       - name: Run transactional tests
-        run: |
-          set +e
-          bash -x tests/test_p3ta_tricks_transaction.sh > transaction.log 2>&1
-          rc=$?
-          cat transaction.log
-          printf '%s\n' "$rc" > transaction.rc
-          exit "$rc"
-      - name: Upload transactional debug bundle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: p3ta-tricks-debug
-          path: |
-            transaction.log
-            transaction.rc
-            lib/install_p3ta_tricks.sh
-          if-no-files-found: error
+        run: bash tests/test_p3ta_tricks_transaction.sh
       - name: Run integration contract tests
         run: bash tests/test_p3ta_tricks_integration.sh
