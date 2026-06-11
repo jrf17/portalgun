@@ -36,14 +36,15 @@ jobs:
           cat transaction.log
           printf '%s\n' "$rc" > transaction.rc
           exit "$rc"
-      - name: Upload transactional test log
+      - name: Upload transactional debug bundle
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: p3ta-tricks-transaction-log
+          name: p3ta-tricks-debug
           path: |
             transaction.log
             transaction.rc
+            lib/install_p3ta_tricks.sh
           if-no-files-found: error
       - name: Run integration contract tests
         run: bash tests/test_p3ta_tricks_integration.sh
