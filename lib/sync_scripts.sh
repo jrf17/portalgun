@@ -1,13 +1,23 @@
 #!/bin/bash
 # portalgun → v1 scripts sync
-# Modifies installable_packages.txt and install_github_tools.sh inside markers.
+# Optional repository-maintenance compatibility layer.
+#
+# Runtime installs must not modify the Portalgun source checkout. Set
+# PORTALGUN_SYNC_LEGACY_SCRIPTS=1 only during an intentional repository
+# maintenance operation.
 
 PORTALGUN_MARK_START="# PORTALGUN_MANAGED_START — do not hand-edit between these markers"
 PORTALGUN_MARK_END="# PORTALGUN_MANAGED_END"
 
+_portalgun_legacy_script_sync_enabled() {
+    [ "${PORTALGUN_SYNC_LEGACY_SCRIPTS:-0}" = "1" ]
+}
+
 sync_apt_to_script() {
     local pkg="$1"
     local script="$PORTALGUN_REPO_DIR/data/installable_packages.txt"
+
+    _portalgun_legacy_script_sync_enabled || return 0
 
     if [ ! -f "$script" ]; then
         print_warning "v1 script not found: $script (apt-to-script sync skipped)"
@@ -41,6 +51,8 @@ PYEOF
 sync_github_to_script() {
     local id_name="$1"
     local script="$PORTALGUN_REPO_DIR/installers/install_github_tools.sh"
+
+    _portalgun_legacy_script_sync_enabled || return 0
 
     if [ ! -f "$script" ]; then
         print_warning "v1 script not found: $script (github-to-script sync skipped)"

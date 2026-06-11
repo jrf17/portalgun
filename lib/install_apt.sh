@@ -41,8 +41,12 @@ install_apt() {
     registry_write apt "$pkg" "$json"
     print_success "Registered → $PORTALGUN_REGISTRY/apt/$pkg.json"
 
-    source "$PORTALGUN_LIB/sync_scripts.sh"
     source "$PORTALGUN_LIB/sync_web.sh"
-    sync_apt_to_script "$pkg"
+
+    if [ "${PORTALGUN_SYNC_LEGACY_SCRIPTS:-0}" = "1" ]; then
+        source "$PORTALGUN_LIB/sync_scripts.sh"
+        sync_apt_to_script "$pkg"
+    fi
+
     sync_web_manifest
 }

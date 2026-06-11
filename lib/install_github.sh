@@ -167,8 +167,12 @@ install_github() {
     print_success "Registered → $PORTALGUN_REGISTRY/github/$id_name.json"
     print_success "Status: $status"
 
-    source "$PORTALGUN_LIB/sync_scripts.sh"
     source "$PORTALGUN_LIB/sync_web.sh"
-    sync_github_to_script "$id_name"
+
+    if [ "${PORTALGUN_SYNC_LEGACY_SCRIPTS:-0}" = "1" ]; then
+        source "$PORTALGUN_LIB/sync_scripts.sh"
+        sync_github_to_script "$id_name"
+    fi
+
     sync_web_manifest
 }

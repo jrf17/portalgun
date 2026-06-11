@@ -13,74 +13,12 @@ _progress() {
 
 
 
-# Hoisted out of apply_bundle — bash nested functions pollute global scope
-_apply_dotfiles_for_user() {
-    local user="$1" CONFIGS_DIR="$2"
-    local home
-    home=$(getent passwd "$user" | cut -d: -f6)
-    [ -z "$home" ] || [ ! -d "$home" ] && return
-
-    print_status "  Configuring $user ($home)..."
-
-    [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$home/.zshrc" && chown "$user:$user" "$home/.zshrc" 2>/dev/null || true
-    [ -f "$CONFIGS_DIR/tmux.conf" ] && cp "$CONFIGS_DIR/tmux.conf" "$home/.tmux.conf" && chown "$user:$user" "$home/.tmux.conf" 2>/dev/null || true
-    mkdir -p "$home/.config"
-    [ -f "$CONFIGS_DIR/starship.toml" ] && cp "$CONFIGS_DIR/starship.toml" "$home/.config/starship.toml" && chown "$user:$user" "$home/.config/starship.toml" 2>/dev/null || true
-    mkdir -p "$home/.config/kitty"
-    [ -f "$CONFIGS_DIR/kitty.conf" ] && cp "$CONFIGS_DIR/kitty.conf" "$home/.config/kitty/kitty.conf" && chown -R "$user:$user" "$home/.config/kitty" 2>/dev/null || true
-
-    # zellij
-    local ZELLIJ_CONFIGS="$CONFIGS_DIR/zellij"
-    if [ -d "$ZELLIJ_CONFIGS" ]; then
-        mkdir -p "$home/.config/zellij/layouts" "$home/.config/zellij/plugins"
-        cp -r "$ZELLIJ_CONFIGS/"* "$home/.config/zellij/" 2>/dev/null || true
-        chown -R "$user:$user" "$home/.config/zellij" 2>/dev/null || true
-    fi
-
-    # oh-my-zsh
-    if [ ! -d "$home/.oh-my-zsh" ]; then
-        print_status "    Installing oh-my-zsh for $user..."
-        if [ "$user" = "root" ]; then
-            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
-        else
-            sudo -u "$user" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended 2>/dev/null || true
-        fi
-        # oh-my-zsh overwrites .zshrc — restore our config
-        [ -f "$CONFIGS_DIR/zshrc" ] && cp "$CONFIGS_DIR/zshrc" "$home/.zshrc" && chown "$user:$user" "$home/.zshrc" 2>/dev/null || true
-    fi
-
-    # zsh plugins
-    local ZSH_CUSTOM="$home/.oh-my-zsh/custom"
-    for plugin_url in "https://github.com/zsh-users/zsh-syntax-highlighting.git" "https://github.com/zsh-users/zsh-autosuggestions"; do
-        local plugin_name
-        plugin_name=$(basename "$plugin_url" .git)
-        if [ ! -d "$ZSH_CUSTOM/plugins/$plugin_name" ]; then
-            [ "$user" = "root" ] && git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
-            [ "$user" != "root" ] && sudo -u "$user" git clone -q "$plugin_url" "$ZSH_CUSTOM/plugins/$plugin_name" 2>/dev/null || true
-        fi
-    done
-
-    # TPM + tmux plugins — pre-clone (TPM headless install doesn't work outside tmux session)
-    mkdir -p "$home/.tmux/plugins"
-    if [ ! -d "$home/.tmux/plugins/tpm" ]; then
-        [ "$user" = "root" ] && git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
-        [ "$user" != "root" ] && sudo -u "$user" git clone -q https://github.com/tmux-plugins/tpm "$home/.tmux/plugins/tpm" 2>/dev/null || true
-    fi
-    for plugin_url in "https://github.com/tmux-plugins/tmux-sensible" "https://github.com/tmux-plugins/tmux-resurrect" "https://github.com/tmux-plugins/tmux-yank"; do
-        local plugin_name
-        plugin_name=$(basename "$plugin_url")
-        if [ ! -d "$home/.tmux/plugins/$plugin_name" ]; then
-            [ "$user" = "root" ] && git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
-            [ "$user" != "root" ] && sudo -u "$user" git clone -q "$plugin_url" "$home/.tmux/plugins/$plugin_name" 2>/dev/null || true
-        fi
-    done
-
-    # Only chsh if not already zsh — don't force it unconditionally
-    local current_shell
-    current_shell=$(getent passwd "$user" | cut -d: -f7)
-    [ "$current_shell" != "/usr/bin/zsh" ] && chsh -s /usr/bin/zsh "$user" 2>/dev/null || true
-    print_success "    $user: shell + tmux + zellij configured"
-}
+# Profile engine is optional only for compatibility with older installed trees.
+# Current Portalgun installs always ship it.
+if [ -f "${PORTALGUN_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/profile.sh" ]; then
+    # shellcheck source=lib/profile.sh
+    source "${PORTALGUN_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/profile.sh"
+fi
 
 apply_bundle() {
     # Separate bundle file from flags — first non-flag arg is the bundle path
@@ -155,21 +93,50 @@ apply_bundle() {
         print_status "Phase 1: apt packages ($apt_count)"
 
         local apt_needed=()
+        local apt_profile_excluded=0
+        local apt_profile_decision=0
+        local active_profile="${PORTALGUN_PROFILE:-$(profile_resolve_name)}"
+
         while IFS= read -r pkg; do
             [ -z "$pkg" ] && continue
-            # Skip if either the registry knows about it OR dpkg shows it
-            # installed system-wide. Falling back to dpkg keeps idempotency
-            # honest when apt was driven by install.sh's legacy path (which
-            # doesn't touch the registry) or by manual sysadmin work.
-            if registry_exists apt "$pkg" || dpkg -s "$pkg" >/dev/null 2>&1; then
+
+            if declare -F profile_allows_apt_package >/dev/null 2>&1; then
+                if profile_allows_apt_package "$pkg" "$active_profile"; then
+                    :
+                else
+                    apt_profile_decision=$?
+
+                    case "$apt_profile_decision" in
+                        1)
+                            print_status "  [profile-skip] $pkg"
+                            apt_profile_excluded=$((apt_profile_excluded + 1))
+                            continue
+                            ;;
+                        *)
+                            print_error                                 "Unable to evaluate APT package '$pkg' for profile '$active_profile'"
+                            return "$apt_profile_decision"
+                            ;;
+                    esac
+                fi
+            fi
+
+            # Skip if either the registry knows about it or dpkg shows it
+            # installed system-wide.
+            if registry_exists apt "$pkg" ||
+                dpkg -s "$pkg" >/dev/null 2>&1
+            then
                 continue
             fi
+
             apt_needed+=("$pkg")
         done < <(jq -r '.tools.apt[]' "$bundle_file")
 
-        local apt_skip=$(( apt_count - ${#apt_needed[@]} ))
         local apt_total=${#apt_needed[@]}
-        print_status "  $apt_skip already installed, $apt_total to install"
+        local apt_already=$((apt_count - apt_total - apt_profile_excluded))
+
+        [ "$apt_already" -ge 0 ] || apt_already=0
+
+        print_status             "$apt_already already installed, "             "$apt_profile_excluded excluded by profile, "             "$apt_total to install"
 
         if [ "$apt_total" -gt 0 ]; then
             _progress 2 "Phase 1: Downloading apt packages ($apt_total)..."
@@ -353,79 +320,163 @@ apply_bundle() {
         _progress 96 "Phase 4: Installing cargo tools..."
         print_status "Phase 4: cargo packages ($cargo_count)"
 
-        if ! command -v cargo >/dev/null 2>&1; then
-            print_warning "cargo not found — skipping cargo phase"
+        local cargo_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-$(id -un)}}"
+        local cargo_home
+        local cargo_path
+        local -a cargo_runner
+
+        cargo_home=$(getent passwd "$cargo_user" | cut -d: -f6)
+
+        if ! id "$cargo_user" >/dev/null 2>&1 ||
+            [ -z "$cargo_home" ] ||
+            [ ! -d "$cargo_home" ]
+        then
+            print_warning                 "Cargo target user is invalid or has no home: $cargo_user"
         else
-            local cargo_ok=0 cargo_skip=0 cargo_fail=0 cargo_done=0
+            cargo_path="$cargo_home/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-            while IFS= read -r pkg_name; do
-                [ -z "$pkg_name" ] && continue
-                cargo_done=$(( cargo_done + 1 ))
-                local safe_id
-                safe_id=$(echo "$pkg_name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '_')
-                local pct=$(( 96 + ( cargo_done * 3 / cargo_count ) ))
-                _progress "$pct" "Phase 4: cargo [$cargo_done/$cargo_count] $pkg_name"
+            if [ "$(id -un)" = "$cargo_user" ]; then
+                cargo_runner=(
+                    env
+                    HOME="$cargo_home"
+                    USER="$cargo_user"
+                    LOGNAME="$cargo_user"
+                    PATH="$cargo_path"
+                )
+            else
+                cargo_runner=(
+                    sudo -H -u "$cargo_user"
+                    env
+                    HOME="$cargo_home"
+                    USER="$cargo_user"
+                    LOGNAME="$cargo_user"
+                    PATH="$cargo_path"
+                )
+            fi
 
-                if registry_exists cargo "$safe_id"; then
-                    printf "  ${CYAN}[skip]${NC} %s\n" "$pkg_name"
-                    (( cargo_skip++ )) || true
-                    continue
-                fi
+            if ! "${cargo_runner[@]}" cargo --version >/dev/null 2>&1; then
+                print_warning                     "cargo is unavailable for target user '$cargo_user'"
+            else
+                local cargo_ok=0
+                local cargo_skip=0
+                local cargo_fail=0
+                local cargo_done=0
 
-                printf "  ${BLUE}[cargo]${NC} %s ... " "$pkg_name"
-                if cargo install "$pkg_name" --quiet 2>/dev/null; then
+                while IFS= read -r pkg_name; do
+                    [ -n "$pkg_name" ] || continue
+
+                    cargo_done=$((cargo_done + 1))
+
+                    local safe_id
+                    local pct
+                    local cargo_list
                     local ver
-                    ver=$(cargo install --list 2>/dev/null | grep "^${pkg_name} " | head -1 | sed 's/.* v//;s/:.*//')
                     local json
-                    json=$(jq -n \
-                        --arg name    "$pkg_name" \
-                        --arg package "$pkg_name" \
-                        --arg version "$ver" \
-                        --arg added   "$(date -Iseconds)" \
-                        '{name:$name,type:"cargo",package:$package,version:$version,status:"ok",added:$added}')
-                    registry_write cargo "$safe_id" "$json"
-                    printf "${GREEN}ok${NC}\n"
-                    (( cargo_ok++ )) || true
-                else
-                    printf "${RED}FAILED${NC}\n"
-                    (( cargo_fail++ )) || true
-                fi
-            done < <(jq -r '(.tools.cargo // [])[]' "$bundle_file")
 
-            echo ""
-            print_status "cargo: $cargo_ok installed, $cargo_skip skipped, $cargo_fail failed"
+                    safe_id=$(
+                        echo "$pkg_name" |
+                        tr '[:upper:]' '[:lower:]' |
+                        tr -cs 'a-z0-9._-' '_'
+                    )
+
+                    pct=$((96 + (cargo_done * 3 / cargo_count)))
+
+                    _progress                         "$pct"                         "Phase 4: cargo [$cargo_done/$cargo_count] $pkg_name"
+
+                    cargo_list=$(
+                        "${cargo_runner[@]}"                             cargo install --list 2>/dev/null || true
+                    )
+
+                    if registry_exists cargo "$safe_id"; then
+                        printf "  ${CYAN}[skip]${NC} %s\n" "$pkg_name"
+                        cargo_skip=$((cargo_skip + 1))
+                        continue
+                    fi
+
+                    if printf '%s\n' "$cargo_list" |
+                        grep -q "^${pkg_name} "
+                    then
+                        ver=$(
+                            printf '%s\n' "$cargo_list" |
+                            grep "^${pkg_name} " |
+                            head -n 1 |
+                            sed -E 's/^[^ ]+ v([^:]+):$/\1/'
+                        )
+
+                        json=$(
+                            jq -n                                 --arg name "$pkg_name"                                 --arg package "$pkg_name"                                 --arg version "$ver"                                 --arg added "$(date -Iseconds)"                                 '{
+                                    name: $name,
+                                    type: "cargo",
+                                    package: $package,
+                                    version: $version,
+                                    status: "ok",
+                                    added: $added
+                                }'
+                        )
+
+                        registry_write cargo "$safe_id" "$json"
+
+                        printf                             "  ${CYAN}[skip]${NC} %s already installed for %s\n"                             "$pkg_name"                             "$cargo_user"
+
+                        cargo_skip=$((cargo_skip + 1))
+                        continue
+                    fi
+
+                    printf "  ${BLUE}[cargo]${NC} %s ... " "$pkg_name"
+
+                    if "${cargo_runner[@]}"                         cargo install "$pkg_name" --quiet
+                    then
+                        cargo_list=$(
+                            "${cargo_runner[@]}"                                 cargo install --list 2>/dev/null || true
+                        )
+
+                        ver=$(
+                            printf '%s\n' "$cargo_list" |
+                            grep "^${pkg_name} " |
+                            head -n 1 |
+                            sed -E 's/^[^ ]+ v([^:]+):$/\1/'
+                        )
+
+                        json=$(
+                            jq -n                                 --arg name "$pkg_name"                                 --arg package "$pkg_name"                                 --arg version "$ver"                                 --arg added "$(date -Iseconds)"                                 '{
+                                    name: $name,
+                                    type: "cargo",
+                                    package: $package,
+                                    version: $version,
+                                    status: "ok",
+                                    added: $added
+                                }'
+                        )
+
+                        registry_write cargo "$safe_id" "$json"
+
+                        printf "${GREEN}ok${NC}\n"
+                        cargo_ok=$((cargo_ok + 1))
+                    else
+                        printf "${RED}FAILED${NC}\n"
+                        cargo_fail=$((cargo_fail + 1))
+                    fi
+                done < <(
+                    jq -r '(.tools.cargo // [])[]' "$bundle_file"
+                )
+
+                echo
+                print_status                     "cargo: $cargo_ok installed, "                     "$cargo_skip skipped, "                     "$cargo_fail failed for $cargo_user"
+            fi
         fi
-        echo ""
+
+        echo
     fi
 
-    # ── Phase 5: dotfiles — apply p3ta config for root + first user ──
-    _progress 96 "Phase 5: Applying p3ta dotfiles..."
-    print_status "Phase 5: dotfiles (p3ta default config)"
-
-    local CONFIGS_DIR="$PORTALGUN_REPO_DIR/configs"
-
-    # Apply to both root and the sudo user (kali or whoever invoked sudo)
-    local FIRST_USER="${SUDO_USER:-kali}"
-    local USERS_TO_CONFIGURE=("root" "$FIRST_USER")
-
-    # Install Rust terminal tools via direct binary download (most reliable)
-    # cargo-binstall is unreliable in this environment, so download from GitHub releases directly
-
-    # Zellij
-    if ! command -v zellij >/dev/null 2>&1; then
-        _progress 96 "Phase 5: Installing zellij..."
-        local ZELLIJ_VER
-        ZELLIJ_VER=$(curl -s https://api.github.com/repos/zellij-org/zellij/releases/latest | grep tag_name | cut -d'"' -f4 2>/dev/null || echo "v0.44.3")
-        if curl -sL "https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VER}/zellij-x86_64-unknown-linux-musl.tar.gz" | tar xz -C /usr/local/bin/ 2>/dev/null; then
-            print_success "  zellij $ZELLIJ_VER installed"
-        else
-            print_warning "  zellij download failed"
-        fi
-    fi
+    # ── Phase 5: profile-aware terminal environment + dotfiles ─────
+    # Yazi and lazydocker are general workflow tools, not profile choices.
+    # The terminal, multiplexer, shell, framework, and user dotfiles are all
+    # delegated to the profile engine so bundle replay cannot overwrite the
+    # profile selected by install.sh or the CLI.
+    _progress 96 "Phase 5: Applying terminal profile..."
 
     # Yazi + ya
     if ! command -v yazi >/dev/null 2>&1; then
-        _progress 97 "Phase 5: Installing yazi..."
         local YAZI_VER
         YAZI_VER=$(curl -s https://api.github.com/repos/sxyazi/yazi/releases/latest | grep tag_name | cut -d'"' -f4 2>/dev/null)
         if [ -n "$YAZI_VER" ]; then
@@ -441,9 +492,7 @@ apply_bundle() {
 
     # Lazydocker
     if ! command -v lazydocker >/dev/null 2>&1; then
-        _progress 98 "Phase 5: Installing lazydocker..."
         if curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash 2>/dev/null; then
-            # The script installs to ~/.local/bin — copy to /usr/local/bin
             [ -f "$HOME/.local/bin/lazydocker" ] && cp "$HOME/.local/bin/lazydocker" /usr/local/bin/ 2>/dev/null
             command -v lazydocker >/dev/null 2>&1 && print_success "  lazydocker installed" || print_warning "  lazydocker not in PATH"
         else
@@ -451,21 +500,25 @@ apply_bundle() {
         fi
     fi
 
-    if [ -d "$CONFIGS_DIR" ]; then
-        for user in "${USERS_TO_CONFIGURE[@]}"; do
-            _apply_dotfiles_for_user "$user" "$CONFIGS_DIR"
-        done
+    if declare -F profile_apply >/dev/null 2>&1; then
+        local active_profile
+        active_profile=$(profile_resolve_name "${PORTALGUN_PROFILE:-}")
+        print_status "Phase 5: terminal profile ($active_profile)"
+        profile_apply "$active_profile"
 
-        # Copy configs to dotfiles dir for web UI Config Manager
-        local DOTFILES_DIR="/opt/tools-docs/dotfiles"
-        mkdir -p "$DOTFILES_DIR"
-        for f in zshrc zshrc_nerd zshrc_kali_default kitty.conf starship.toml; do
-            [ -f "$CONFIGS_DIR/$f" ] && cp "$CONFIGS_DIR/$f" "$DOTFILES_DIR/$f"
-        done
-        chown -R "$FIRST_USER:$FIRST_USER" "$DOTFILES_DIR"
-        print_success "Dotfiles applied for: ${USERS_TO_CONFIGURE[*]}"
+        # Publish the selected profile's files for the web dotfile manager.
+        local profile_dotfiles profile_web_dir first_user
+        profile_dotfiles="$(profile_path "$active_profile")/$(jq -r '.dotfiles.source // "dotfiles"' "$(profile_file "$active_profile")")"
+        profile_web_dir="/opt/tools-docs/dotfiles/profiles/$active_profile"
+        first_user="${PORTALGUN_TARGET_USER:-${SUDO_USER:-kali}}"
+        if [ -d "$profile_dotfiles" ]; then
+            mkdir -p "$profile_web_dir"
+            rsync -a --delete "$profile_dotfiles/" "$profile_web_dir/"
+            chown -R "$first_user:$first_user" "/opt/tools-docs/dotfiles/profiles" 2>/dev/null || true
+        fi
     else
-        print_warning "Configs dir not found — skipping dotfiles phase"
+        print_error "Profile engine is missing; refusing to apply hard-coded dotfiles"
+        return 1
     fi
     echo ""
 

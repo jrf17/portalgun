@@ -4,11 +4,13 @@
 
 ## TL;DR
 
-On a fresh Kali, one command does everything:
+On a fresh Kali, select a terminal profile and run the installer as the normal desktop user:
 
 ```bash
-sudo ./install.sh
+./install.sh --profile default
 ```
+
+Run `./install.sh` without `--profile` for an interactive selector. Use `kali-default` to preserve Kali's existing terminal and shell choices. See [Terminal profiles](docs/PROFILES.md).
 
 Then on the running system, add a new tool with one command:
 
@@ -38,6 +40,9 @@ sudo portalgun install github <url> [dir]        # clone + auto-compile + regist
 portalgun list [apt|github|all]                  # what's installed
 portalgun doctor [--fix-shadows]                 # full diagnostic
 portalgun status                                  # registry totals + paths
+portalgun profile list                            # available terminal profiles
+sudo portalgun --profile joseph profile apply     # apply one profile
+portalgun --profile joseph profile verify         # verify profile state
 sudo portalgun sanitize [--yes]                  # prep VM for cloning (DESTRUCTIVE)
 portalgun help
 ```
@@ -58,8 +63,12 @@ Five actions in one shot:
 
 ```bash
 cd portalgun
-sudo ./install.sh
+./install.sh                         # interactive profile selection
+./install.sh --profile joseph        # explicit profile
+./install.sh --profile kali-default  # preserve Kali terminal/shell defaults
 ```
+
+Do not run the master installer as root; it uses `sudo` only for system-level steps.
 
 Installs to `/opt/portalgun/`, symlinks `/usr/local/bin/portalgun`, sets up zsh completion, creates `/var/lib/portalgun/registry/` and `/var/log/portalgun/`, deploys `portalgun_tools.html` + `portalgun_wiki.html` to `/opt/tools-docs/`, and enables `portalgun-firstboot.service` for clone identity regeneration.
 

@@ -41,6 +41,8 @@ rsync -a --delete "$SRC_ROOT/bin/"        "$INSTALL_ROOT/bin/"
 rsync -a --delete "$SRC_ROOT/lib/"        "$INSTALL_ROOT/lib/"
 rsync -a --delete "$SRC_ROOT/completion/" "$INSTALL_ROOT/completion/"
 rsync -a --delete "$SRC_ROOT/web/"        "$INSTALL_ROOT/web/"
+rsync -a --delete "$SRC_ROOT/profiles/"   "$INSTALL_ROOT/profiles/"
+rsync -a --delete "$SRC_ROOT/components/" "$INSTALL_ROOT/components/"
 mkdir -p "$INSTALL_ROOT/data"
 [ -f "$SRC_ROOT/data/bapp-catalog.json" ] && \
     cp "$SRC_ROOT/data/bapp-catalog.json" "$INSTALL_ROOT/data/bapp-catalog.json"
@@ -50,6 +52,7 @@ fi
 
 chmod +x "$INSTALL_ROOT/bin/portalgun" "$INSTALL_ROOT/bin/portalgun-firstboot.sh"
 chmod +x "$INSTALL_ROOT/lib/"*.py 2>/dev/null || true
+chmod +x "$INSTALL_ROOT/components/"*/*.sh 2>/dev/null || true
 
 print_success "Files copied"
 
@@ -65,7 +68,7 @@ print_success "Linked $BIN_LINK → $INSTALL_ROOT/bin/portalgun"
 
 # ─── Registry + log dirs ────────────────────────────────────────────
 mkdir -p "$REGISTRY_DIR/apt" "$REGISTRY_DIR/github" \
-         "$REGISTRY_DIR/pip" "$REGISTRY_DIR/cargo" "$LOG_DIR"
+         "$REGISTRY_DIR/pip" "$REGISTRY_DIR/cargo" "$LOG_DIR" "/var/lib/portalgun"
 chmod 755 "$REGISTRY_DIR" "$LOG_DIR"
 print_success "Registry dir: $REGISTRY_DIR"
 print_success "Log dir:      $LOG_DIR"
