@@ -311,10 +311,17 @@ install_p3ta_tricks() (
     _p3ta_install_prerequisites
     _p3ta_ensure_service_user
 
-    local parent_root previous_root stage_root unit_path
-    local unit_backup="" launcher_backup=""
-    local previous_install=0 tree_activated=0 committed=0
-    local unit_touched=0 launcher_touched=0
+    parent_root=""
+    previous_root=""
+    stage_root=""
+    unit_path=""
+    unit_backup=""
+    launcher_backup=""
+    previous_install=0
+    tree_activated=0
+    committed=0
+    unit_touched=0
+    launcher_touched=0
     parent_root=$(dirname "$PORTALGUN_P3TA_TRICKS_ROOT")
     previous_root="${PORTALGUN_P3TA_TRICKS_ROOT}.previous"
     unit_path=$(_p3ta_unit_path)
