@@ -2,16 +2,13 @@
 # portalgun — install tools and register them in scripts + web UI
 set -e
 
-# ─── Configuration (overridable via env) ────────────────────────────
 PORTALGUN_ROOT="${PORTALGUN_ROOT:-/opt/portalgun}"
 PORTALGUN_LIB="${PORTALGUN_LIB:-$PORTALGUN_ROOT/lib}"
 PORTALGUN_REGISTRY="${PORTALGUN_REGISTRY:-/var/lib/portalgun/registry}"
 PORTALGUN_LOG_DIR="${PORTALGUN_LOG_DIR:-/var/log/portalgun}"
 PORTALGUN_TOOLS_BASE="${PORTALGUN_TOOLS_BASE:-/opt/tools}"
 PORTALGUN_WEB_DIR="${PORTALGUN_WEB_DIR:-/opt/tools-docs}"
-# Source repo dir — where the merged portalgun repo lives (with installers/ and data/).
-# Auto-detect: try /home/$USER/portalgun, SUDO_USER home, /root/portalgun.
-if [ -z "$PORTALGUN_REPO_DIR" ]; then
+if [ -z "${PORTALGUN_REPO_DIR:-}" ]; then
     for candidate in "/home/${SUDO_USER:-$USER}/portalgun" "$HOME/portalgun" "/root/portalgun" "/opt/portalgun"; do
         if [ -d "$candidate/installers" ] && [ -d "$candidate/data" ]; then
             PORTALGUN_REPO_DIR="$candidate"
@@ -21,7 +18,6 @@ if [ -z "$PORTALGUN_REPO_DIR" ]; then
     PORTALGUN_REPO_DIR="${PORTALGUN_REPO_DIR:-/home/kali/portalgun}"
 fi
 
-# Bundle search path — also check /opt/portalgun directly
 export PORTALGUN_BUNDLE_SEARCH="/opt/portalgun/portalgun_bundle.json /home/kali/portalgun/portalgun_bundle.json"
 if [ -z "${PORTALGUN_PROFILE_ROOT:-}" ]; then
     if [ -d "$PORTALGUN_REPO_DIR/profiles" ]; then
@@ -35,7 +31,6 @@ export PORTALGUN_ROOT PORTALGUN_LIB PORTALGUN_REGISTRY PORTALGUN_LOG_DIR \
        PORTALGUN_TOOLS_BASE PORTALGUN_WEB_DIR PORTALGUN_REPO_DIR \
        PORTALGUN_PROFILE_ROOT PORTALGUN_COMPONENT_ROOT
 
-# ─── Load common lib ─────────────────────────────────────────────────
 if [ ! -f "$PORTALGUN_LIB/common.sh" ]; then
     echo "portalgun: lib not found at $PORTALGUN_LIB" >&2
     echo "Did you run install.sh?" >&2
@@ -46,7 +41,6 @@ source "$PORTALGUN_LIB/registry.sh"
 source "$PORTALGUN_LIB/detect.sh"
 [ -f "$PORTALGUN_LIB/profile.sh" ] && source "$PORTALGUN_LIB/profile.sh"
 
-# ─── Usage ───────────────────────────────────────────────────────────
 usage() {
     cat <<'EOF'
 portalgun — install tools and register them in scripts + web UI
@@ -56,14 +50,15 @@ USAGE
     portalgun install github <url> [target-dir]
     portalgun install burp                     # Burp Pro JAR + Java 21 + all BApps preloaded
     portalgun install sliver                   # Sliver C2 + full armory preloaded
+    portalgun install p3ta-tricks              # offline pentest knowledge service
     portalgun install all [bundle.json]        # install everything from bundle
     portalgun import burp-license <prefs.xml>  # import your registered Burp Pro license blob
-    portalgun update [burp|sliver]             # default: apt+github+pip+cargo; sub: just that one
+    portalgun update [burp|sliver|p3ta-tricks] # default: apt+github+pip+cargo
     portalgun register                         # backfill registry from current installed state
     portalgun export [outfile]                 # dump registry → portalgun_bundle.json
     portalgun list [apt|github|all]
     portalgun status
-    portalgun verify [bundle.json]             # audit bundle + active profile
+    portalgun verify [bundle.json]             # audit bundle + services + active profile
     portalgun profile <list|show|create|validate|apply|current|verify>
     portalgun doctor [--fix-shadows]
     portalgun sanitize [--yes]
@@ -72,17 +67,19 @@ USAGE
 EXAMPLES
     sudo portalgun install apt nmap
     sudo portalgun install github https://github.com/akamai/BadSuccessor /opt/tools/windows/exploit
-    sudo portalgun install burp                # downloads latest Pro + every BApp
+    sudo portalgun install burp
     sudo portalgun import burp-license ~/my-burp-prefs.xml
-    sudo portalgun install sliver              # installs sliver, runs `armory install all`
-    sudo portalgun install all                 # replay from default portalgun_bundle.json
+    sudo portalgun install sliver
+    sudo portalgun install p3ta-tricks
+    sudo portalgun update p3ta-tricks
+    sudo portalgun install all
     sudo portalgun install all /tmp/bundle.json
-    portalgun export                           # writes portalgun_bundle.json
+    portalgun export
     portalgun list github
     portalgun profile list
     sudo portalgun --profile joseph profile apply
     portalgun doctor
-    sudo portalgun sanitize                    # prep VM for cloning (DESTRUCTIVE)
+    sudo portalgun sanitize
 
 BURP PRO NOTES
     - License is NEVER baked in. Each operator imports their own prefs.xml.
@@ -92,9 +89,15 @@ BURP PRO NOTES
     - 'portalgun update burp' re-downloads the latest JAR and re-applies the
       stored license so Pro stays activated across updates.
 
+P3TA-TRICKS NOTES
+    - Installed as an isolated Gunicorn service at /opt/portalgun/p3ta-tricks-offline.
+    - Default URL: http://127.0.0.1:1339/ (service binds on 0.0.0.0 by default).
+    - Override the upstream ref with PORTALGUN_P3TA_TRICKS_REF.
+    - The resolved commit and processed-page count are recorded in the registry.
+
 EVERY install ALSO:
-    1. Records the tool in the registry (/var/lib/portalgun/registry/)
-    2. Updates the web UI's tool listing (portalgun_tools.json)
+    1. Records the tool or component in /var/lib/portalgun/registry/
+    2. Updates or exposes the relevant local web UI
 
 ENVIRONMENT (defaults shown)
     PORTALGUN_ROOT=/opt/portalgun
@@ -105,13 +108,12 @@ ENVIRONMENT (defaults shown)
     PORTALGUN_REPO_DIR=auto-detected (~/portalgun)
     PORTALGUN_PROFILE=default unless explicitly selected or recorded
     PORTALGUN_PROFILE_ROOT=/opt/portalgun/profiles
+    PORTALGUN_P3TA_TRICKS_REF=main
+    PORTALGUN_P3TA_TRICKS_HOST=0.0.0.0
+    PORTALGUN_P3TA_TRICKS_PORT=1339
 EOF
 }
 
-# ─── Global options + dispatch ───────────────────────────────────────
-# Global options are parsed before command dispatch, so these are equivalent:
-#   portalgun --profile joseph profile apply
-#   portalgun profile apply joseph
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --profile)
@@ -152,10 +154,26 @@ case "$cmd" in
                 source "$PORTALGUN_LIB/install_sliver.sh"
                 install_sliver "$@"
                 ;;
+            p3ta-tricks|p3ta-tricks-offline|knowledge)
+                shift
+                source "$PORTALGUN_LIB/install_p3ta_tricks.sh"
+                install_p3ta_tricks "$@"
+                ;;
             all)
                 shift
                 source "$PORTALGUN_LIB/apply.sh"
                 apply_bundle "$@"
+
+                if [ "${PORTALGUN_SKIP_P3TA_TRICKS:-0}" != "1" ]; then
+                    source "$PORTALGUN_LIB/install_p3ta_tricks.sh"
+                    if verify_p3ta_tricks >/dev/null 2>&1; then
+                        systemctl restart "$PORTALGUN_P3TA_TRICKS_SERVICE"
+                        _p3ta_wait_for_health
+                        print_success "p3ta-tricks refreshed against the final tool inventory"
+                    else
+                        install_p3ta_tricks
+                    fi
+                fi
                 ;;
             ""|-h|--help)
                 usage; exit 0
@@ -177,6 +195,10 @@ case "$cmd" in
             sliver)
                 source "$PORTALGUN_LIB/install_sliver.sh"
                 update_sliver
+                ;;
+            p3ta-tricks|p3ta-tricks-offline|knowledge)
+                source "$PORTALGUN_LIB/install_p3ta_tricks.sh"
+                update_p3ta_tricks
                 ;;
             *)
                 source "$PORTALGUN_LIB/update.sh"
@@ -217,7 +239,32 @@ case "$cmd" in
         ;;
     verify)
         source "$PORTALGUN_LIB/verify.sh"
+
+        set +e
         verify_install "${1:-}"
+        verify_rc=$?
+
+        p3ta_rc=0
+        if [ "${PORTALGUN_SKIP_P3TA_TRICKS:-0}" != "1" ]; then
+            if [ -f "$PORTALGUN_LIB/install_p3ta_tricks.sh" ]; then
+                source "$PORTALGUN_LIB/install_p3ta_tricks.sh"
+                verify_p3ta_tricks_section
+                p3ta_rc=$?
+            else
+                echo "── Offline knowledge ─────────────────────"
+                echo "  ✗ p3ta-tricks integration       verifier module missing"
+                p3ta_rc=2
+            fi
+        fi
+        set -e
+
+        if [ "$verify_rc" -ge 2 ] || [ "$p3ta_rc" -ge 2 ]; then
+            exit 2
+        fi
+        if [ "$verify_rc" -eq 1 ] || [ "$p3ta_rc" -eq 1 ]; then
+            exit 1
+        fi
+        exit 0
         ;;
     profile)
         if ! declare -F profile_command >/dev/null 2>&1; then
