@@ -18,7 +18,8 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGES_FILE="$SCRIPT_DIR/../data/installable_packages.txt"
-FAILED_FILE="$SCRIPT_DIR/../data/failed_packages.txt"
+PORTALGUN_LOG_DIR="/var/log/portalgun"
+FAILED_FILE="$PORTALGUN_LOG_DIR/failed_packages.txt"
 
 # ───────────────────────────────────────────────────────────────────
 # Parse arguments
@@ -78,8 +79,6 @@ fi
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
 
-> "$FAILED_FILE"
-
 # ───────────────────────────────────────────────────────────────────
 # Check all packages
 # ───────────────────────────────────────────────────────────────────
@@ -135,6 +134,14 @@ if [ "$CHECK_ONLY" = true ]; then
     echo ""
     exit 0
 fi
+
+# Runtime results belong outside the source checkout. Clear the previous
+# failure report even when this run ultimately has nothing to install.
+FAILED_OWNER="$(id -un)"
+FAILED_GROUP="$(id -gn)"
+sudo install -d -m 0755 "$PORTALGUN_LOG_DIR"
+sudo install -o "$FAILED_OWNER" -g "$FAILED_GROUP" \
+    -m 0644 /dev/null "$FAILED_FILE"
 
 # ───────────────────────────────────────────────────────────────────
 # Nothing to install?

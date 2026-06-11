@@ -598,6 +598,7 @@ if [ "${PORTALGUN_SKIP_BUNDLE:-0}" != "1" ] && command -v portalgun >/dev/null 2
     #   - cargo: installs all crates
     #   - register_all + sync_web_manifest at the tail → populates /var/lib + manifest
     # Burp/Sliver still skipped here; they run as explicit Phase 11/12 below.
+    PORTALGUN_SYNC_LEGACY_SCRIPTS=0 \
     PORTALGUN_SKIP_BURP=1 PORTALGUN_SKIP_SLIVER=1 \
         sudo -E env PORTALGUN_PROFILE="$PORTALGUN_PROFILE" \
           PORTALGUN_PROFILE_ROOT="/opt/portalgun/profiles" \
