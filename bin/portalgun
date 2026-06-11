@@ -2,15 +2,12 @@
 # portalgun — install tools and register them in scripts + web UI
 set -e
 
-# ─── Configuration (overridable via env) ────────────────────────────
 PORTALGUN_ROOT="${PORTALGUN_ROOT:-/opt/portalgun}"
 PORTALGUN_LIB="${PORTALGUN_LIB:-$PORTALGUN_ROOT/lib}"
 PORTALGUN_REGISTRY="${PORTALGUN_REGISTRY:-/var/lib/portalgun/registry}"
 PORTALGUN_LOG_DIR="${PORTALGUN_LOG_DIR:-/var/log/portalgun}"
 PORTALGUN_TOOLS_BASE="${PORTALGUN_TOOLS_BASE:-/opt/tools}"
 PORTALGUN_WEB_DIR="${PORTALGUN_WEB_DIR:-/opt/tools-docs}"
-# Source repo dir — where the merged portalgun repo lives (with installers/ and data/).
-# Auto-detect: try /home/$USER/portalgun, SUDO_USER home, /root/portalgun.
 if [ -z "${PORTALGUN_REPO_DIR:-}" ]; then
     for candidate in "/home/${SUDO_USER:-$USER}/portalgun" "$HOME/portalgun" "/root/portalgun" "/opt/portalgun"; do
         if [ -d "$candidate/installers" ] && [ -d "$candidate/data" ]; then
@@ -21,7 +18,6 @@ if [ -z "${PORTALGUN_REPO_DIR:-}" ]; then
     PORTALGUN_REPO_DIR="${PORTALGUN_REPO_DIR:-/home/kali/portalgun}"
 fi
 
-# Bundle search path — also check /opt/portalgun directly
 export PORTALGUN_BUNDLE_SEARCH="/opt/portalgun/portalgun_bundle.json /home/kali/portalgun/portalgun_bundle.json"
 if [ -z "${PORTALGUN_PROFILE_ROOT:-}" ]; then
     if [ -d "$PORTALGUN_REPO_DIR/profiles" ]; then
@@ -35,7 +31,6 @@ export PORTALGUN_ROOT PORTALGUN_LIB PORTALGUN_REGISTRY PORTALGUN_LOG_DIR \
        PORTALGUN_TOOLS_BASE PORTALGUN_WEB_DIR PORTALGUN_REPO_DIR \
        PORTALGUN_PROFILE_ROOT PORTALGUN_COMPONENT_ROOT
 
-# ─── Load common lib ─────────────────────────────────────────────────
 if [ ! -f "$PORTALGUN_LIB/common.sh" ]; then
     echo "portalgun: lib not found at $PORTALGUN_LIB" >&2
     echo "Did you run install.sh?" >&2
@@ -46,7 +41,6 @@ source "$PORTALGUN_LIB/registry.sh"
 source "$PORTALGUN_LIB/detect.sh"
 [ -f "$PORTALGUN_LIB/profile.sh" ] && source "$PORTALGUN_LIB/profile.sh"
 
-# ─── Usage ───────────────────────────────────────────────────────────
 usage() {
     cat <<'EOF'
 portalgun — install tools and register them in scripts + web UI
@@ -120,7 +114,6 @@ ENVIRONMENT (defaults shown)
 EOF
 }
 
-# ─── Global options + dispatch ───────────────────────────────────────
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --profile)
@@ -170,6 +163,17 @@ case "$cmd" in
                 shift
                 source "$PORTALGUN_LIB/apply.sh"
                 apply_bundle "$@"
+
+                if [ "${PORTALGUN_SKIP_P3TA_TRICKS:-0}" != "1" ]; then
+                    source "$PORTALGUN_LIB/install_p3ta_tricks.sh"
+                    if verify_p3ta_tricks >/dev/null 2>&1; then
+                        systemctl restart "$PORTALGUN_P3TA_TRICKS_SERVICE"
+                        _p3ta_wait_for_health
+                        print_success "p3ta-tricks refreshed against the final tool inventory"
+                    else
+                        install_p3ta_tricks
+                    fi
+                fi
                 ;;
             ""|-h|--help)
                 usage; exit 0
