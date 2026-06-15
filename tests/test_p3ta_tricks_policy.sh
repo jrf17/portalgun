@@ -67,4 +67,9 @@ grep -Fq 'Environment=OFFLINE_MODE=1' "$unit" || fail "offline mode missing"
 grep -Fq 'Environment=TOOLS_DIR=/opt/tools' "$unit" || fail "tools path missing"
 grep -Fq 'ProtectSystem=strict' "$unit" || fail "filesystem hardening missing"
 grep -Fq 'NoNewPrivileges=true' "$unit" || fail "privilege hardening missing"
+grep -Fq "ExecStart=$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/python3 -m gunicorn " "$unit" ||
+    fail "service does not launch Gunicorn through the relocated venv interpreter"
+if grep -Fq "ExecStart=$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/gunicorn " "$unit"; then
+    fail "service directly executes a staging-bound Gunicorn console script"
+fi
 pass "p3ta-tricks service policy"

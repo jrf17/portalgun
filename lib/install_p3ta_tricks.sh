@@ -255,7 +255,10 @@ Environment=OFFLINE_MODE=1
 Environment=TOOLS_DIR=$PORTALGUN_P3TA_TRICKS_TOOLS_DIR
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/gunicorn --bind $PORTALGUN_P3TA_TRICKS_HOST:$PORTALGUN_P3TA_TRICKS_PORT --workers 2 --timeout 60 --access-logfile - --error-logfile - app:app
+# The venv is built under a temporary staging path and then atomically moved.
+# Pip console-script shebangs retain that staging path, so launch Gunicorn
+# through the relocated venv interpreter instead of bin/gunicorn.
+ExecStart=$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/python3 -m gunicorn --bind $PORTALGUN_P3TA_TRICKS_HOST:$PORTALGUN_P3TA_TRICKS_PORT --workers 2 --timeout 60 --access-logfile - --error-logfile - app:app
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=20
@@ -483,7 +486,8 @@ verify_p3ta_tricks() {
     local page_count current_commit recorded_commit recorded_pages
 
     [ -d "$source_root" ] || { _p3ta_die "p3ta-tricks source tree is missing"; return 1; }
-    [ -x "$venv_root/bin/gunicorn" ] || { _p3ta_die "p3ta-tricks runtime is missing"; return 1; }
+    [ -x "$venv_root/bin/python3" ] || { _p3ta_die "p3ta-tricks runtime is missing"; return 1; }
+    "$venv_root/bin/python3" -c 'import gunicorn' >/dev/null 2>&1 || { _p3ta_die "p3ta-tricks Gunicorn module is unavailable"; return 1; }
     [ -s "$PORTALGUN_P3TA_TRICKS_REGISTRY" ] || { _p3ta_die "p3ta-tricks registry is missing"; return 1; }
 
     page_count=$(_p3ta_validate_checkout "$source_root")
@@ -523,7 +527,8 @@ verify_p3ta_tricks_section() {
     else
         _p3ta_row "$FAIL_MARK" "p3ta-tricks content" "missing, unsafe, or incomplete"; failures=$((failures + 1))
     fi
-    if [ -x "$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/gunicorn" ]; then
+    if [ -x "$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/python3" ] &&
+        "$PORTALGUN_P3TA_TRICKS_ROOT/venv/bin/python3" -c 'import gunicorn' >/dev/null 2>&1; then
         _p3ta_row "$PASS_MARK" "p3ta-tricks runtime" "isolated Gunicorn environment"
     else
         _p3ta_row "$FAIL_MARK" "p3ta-tricks runtime" "isolated environment missing"; failures=$((failures + 1))
