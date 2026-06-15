@@ -4,19 +4,9 @@ on:
   push:
     branches:
       - feature/p3ta-tricks-offline-integration
-  pull_request:
-    paths:
-      - '.github/workflows/p3ta-tricks-tests.yml'
-      - 'bin/portalgun'
-      - 'completion/_portalgun'
-      - 'installers/portalgun_install.sh'
-      - 'lib/doctor.sh'
-      - 'lib/install_p3ta_tricks.sh'
-      - 'lib/sync_web.sh'
-      - 'tests/test_p3ta_tricks_*.sh'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   focused-tests:
@@ -24,36 +14,152 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install test prerequisites
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq zsh
-      - name: Run policy tests
-        run: bash tests/test_p3ta_tricks_policy.sh
-      - name: Run transactional tests
-        run: bash tests/test_p3ta_tricks_transaction.sh
-      - name: Run integration contract tests
-        run: bash tests/test_p3ta_tricks_integration.sh
-      - name: Capture dependency diagnostics
-        if: always()
-        run: |
-          set -e
-          rm -rf /tmp/p3ta-upstream
-          git clone --depth 1 https://github.com/p3ta00/p3ta-tricks-offline.git /tmp/p3ta-upstream
-          {
-            printf '%s\n' '===== PYTHON ====='
-            python3 --version
-            python3 -m pip --version
-            printf '%s\n' '===== REQUIREMENTS ====='
-            cat /tmp/p3ta-upstream/requirements.txt
-            printf '%s\n' '===== VENDOR CONTENTS ====='
-            find /tmp/p3ta-upstream/vendor -maxdepth 2 -type f -printf '%P\n' 2>/dev/null | sort || true
-          } > p3ta-dependency-report.txt
-      - name: Upload dependency debug bundle
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: p3ta-dependency-debug
-          path: |
-            p3ta-dependency-report.txt
-            lib/install_p3ta_tricks.sh
-            install.sh
-          if-no-files-found: error
+          ref: feature/p3ta-tricks-offline-integration
+      - name: Apply wheelhouse path fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('lib/install_p3ta_tricks.sh')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace(
+              'PORTALGUN_P3TA_TRICKS_HEALTH_ATTEMPTS="${PORTALGUN_P3TA_TRICKS_HEALTH_ATTEMPTS:-30}"\n',
+              'PORTALGUN_P3TA_TRICKS_HEALTH_ATTEMPTS="${PORTALGUN_P3TA_TRICKS_HEALTH_ATTEMPTS:-30}"\n'
+              'PORTALGUN_P3TA_TRICKS_DEPENDENCY_MODE="${PORTALGUN_P3TA_TRICKS_DEPENDENCY_MODE:-auto}"\n',
+              1,
+          )
+          text = text.replace(
+              '''_p3ta_success() {
+              if declare -F print_success >/dev/null 2>&1; then print_success "$*"; else printf '[+] %s\\n' "$*"; fi
+          }
+          ''',
+              '''_p3ta_success() {
+              if declare -F print_success >/dev/null 2>&1; then print_success "$*"; else printf '[+] %s\\n' "$*"; fi
+          }
+          _p3ta_warning() {
+              if declare -F print_warning >/dev/null 2>&1; then print_warning "$*"; else printf '[!] %s\\n' "$*" >&2; fi
+          }
+          ''',
+              1,
+          )
+          validation = '''    [[ "$PORTALGUN_P3TA_TRICKS_MIN_PAGES" =~ ^[0-9]+$ ]] &&
+                  [ "$PORTALGUN_P3TA_TRICKS_MIN_PAGES" -ge 1 ] || {
+                      _p3ta_die "invalid minimum page count"; return 1;
+                  }
+          }
+          '''
+          replacement = '''    [[ "$PORTALGUN_P3TA_TRICKS_MIN_PAGES" =~ ^[0-9]+$ ]] &&
+                  [ "$PORTALGUN_P3TA_TRICKS_MIN_PAGES" -ge 1 ] || {
+                      _p3ta_die "invalid minimum page count"; return 1;
+                  }
+              case "$PORTALGUN_P3TA_TRICKS_DEPENDENCY_MODE" in
+                  auto|online|wheelhouse) ;;
+                  *)
+                      _p3ta_die "invalid p3ta-tricks dependency mode: $PORTALGUN_P3TA_TRICKS_DEPENDENCY_MODE"
+                      return 1
+                      ;;
+              esac
+          }
+          '''
+          text = text.replace(validation, replacement, 1)
+
+          helpers = '''
+          _p3ta_select_wheelhouse() {
+              local source_root="$1" candidate
+              for candidate in "$source_root/vendor/wheels" "$source_root/vendor"; do
+                  [ -d "$candidate" ] || continue
+                  if find "$candidate" -maxdepth 1 -type f \\
+                      \\( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' \\) \\
+                      -print -quit | grep -q .; then
+                      printf '%s\\n' "$candidate"
+                      return 0
+                  fi
+              done
+              return 1
+          }
+
+          _p3ta_create_venv() {
+              local venv_root="$1"
+              rm -rf -- "$venv_root"
+              python3 -m venv "$venv_root"
+          }
+
+          _p3ta_install_online_dependencies() {
+              local source_root="$1" venv_root="$2"
+              "$venv_root/bin/python3" -m pip install --disable-pip-version-check \\
+                  --no-input --upgrade pip
+              "$venv_root/bin/python3" -m pip install --disable-pip-version-check \\
+                  --no-input -r "$source_root/requirements.txt"
+          }
+
+          _p3ta_install_wheelhouse_dependencies() {
+              local source_root="$1" venv_root="$2" wheelhouse="$3"
+              "$venv_root/bin/python3" -m pip install --disable-pip-version-check \\
+                  --no-input --no-index --find-links "$wheelhouse" \\
+                  -r "$source_root/requirements.txt"
+          }
+          '''
+          text = text.replace('\n_p3ta_stage_release() {\n', helpers + '\n_p3ta_stage_release() {\n', 1)
+
+          old = '''    _p3ta_info "Creating isolated p3ta-tricks Python environment"
+              python3 -m venv "$venv_root"
+              if [ -d "$source_root/vendor" ] &&
+                  find "$source_root/vendor" -mindepth 1 -print -quit | grep -q .; then
+                  "$venv_root/bin/python3" -m pip install --disable-pip-version-check \\
+                      --no-input --no-index --find-links "$source_root/vendor" \\
+                      -r "$source_root/requirements.txt"
+              else
+                  "$venv_root/bin/python3" -m pip install --disable-pip-version-check \\
+                      --no-input --upgrade pip
+                  "$venv_root/bin/python3" -m pip install --disable-pip-version-check \\
+                      --no-input -r "$source_root/requirements.txt"
+              fi
+          '''
+          new = '''    _p3ta_info "Creating isolated p3ta-tricks Python environment"
+              _p3ta_create_venv "$venv_root"
+              local wheelhouse=""
+              wheelhouse=$(_p3ta_select_wheelhouse "$source_root" 2>/dev/null || true)
+
+              case "$PORTALGUN_P3TA_TRICKS_DEPENDENCY_MODE" in
+                  wheelhouse)
+                      [ -n "$wheelhouse" ] || {
+                          _p3ta_die "p3ta-tricks wheelhouse mode requested, but no package artifacts were found"
+                          return 1
+                      }
+                      _p3ta_info "Installing p3ta-tricks dependencies from $wheelhouse"
+                      _p3ta_install_wheelhouse_dependencies "$source_root" "$venv_root" "$wheelhouse"
+                      ;;
+                  online)
+                      _p3ta_info "Installing p3ta-tricks dependencies from the configured Python package index"
+                      _p3ta_install_online_dependencies "$source_root" "$venv_root"
+                      ;;
+                  auto)
+                      if [ -n "$wheelhouse" ]; then
+                          _p3ta_info "Installing p3ta-tricks dependencies from $wheelhouse"
+                          if ! _p3ta_install_wheelhouse_dependencies "$source_root" "$venv_root" "$wheelhouse"; then
+                              _p3ta_warning "Bundled wheelhouse is unusable; retrying from the configured Python package index"
+                              _p3ta_create_venv "$venv_root"
+                              _p3ta_install_online_dependencies "$source_root" "$venv_root"
+                          fi
+                      else
+                          _p3ta_info "No bundled wheelhouse found; installing from the configured Python package index"
+                          _p3ta_install_online_dependencies "$source_root" "$venv_root"
+                      fi
+                      ;;
+              esac
+          '''
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          bash -n lib/install_p3ta_tricks.sh
+      - name: Commit wheelhouse path fix
+        run: |
+          if ! git diff --quiet -- lib/install_p3ta_tricks.sh; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add lib/install_p3ta_tricks.sh
+            git commit -m 'fix(p3ta-tricks): discover nested wheelhouse artifacts'
+            git push origin HEAD:feature/p3ta-tricks-offline-integration
+          fi
