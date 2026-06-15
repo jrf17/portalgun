@@ -32,3 +32,28 @@ jobs:
         run: bash tests/test_p3ta_tricks_transaction.sh
       - name: Run integration contract tests
         run: bash tests/test_p3ta_tricks_integration.sh
+      - name: Capture dependency diagnostics
+        if: always()
+        run: |
+          set -e
+          rm -rf /tmp/p3ta-upstream
+          git clone --depth 1 https://github.com/p3ta00/p3ta-tricks-offline.git /tmp/p3ta-upstream
+          {
+            printf '%s\n' '===== PYTHON ====='
+            python3 --version
+            python3 -m pip --version
+            printf '%s\n' '===== REQUIREMENTS ====='
+            cat /tmp/p3ta-upstream/requirements.txt
+            printf '%s\n' '===== VENDOR CONTENTS ====='
+            find /tmp/p3ta-upstream/vendor -maxdepth 2 -type f -printf '%P\n' 2>/dev/null | sort || true
+          } > p3ta-dependency-report.txt
+      - name: Upload dependency debug bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3ta-dependency-debug
+          path: |
+            p3ta-dependency-report.txt
+            lib/install_p3ta_tricks.sh
+            install.sh
+          if-no-files-found: error
