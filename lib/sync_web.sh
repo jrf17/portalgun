@@ -16,4 +16,11 @@ sync_web_manifest() {
         return 1
     fi
     print_success "Updated web manifest → $out_file"
+
+    if command -v systemctl >/dev/null 2>&1 &&
+        systemctl is-active --quiet portalgun-p3ta-tricks.service 2>/dev/null
+    then
+        systemctl restart portalgun-p3ta-tricks.service 2>/dev/null ||
+            print_warning "p3ta-tricks restart failed after web sync"
+    fi
 }

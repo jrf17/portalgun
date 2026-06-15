@@ -28,7 +28,8 @@ _portalgun() {
                             'github[clone from GitHub, auto-detect compile]' \
                             'burp[install Burp Suite Pro]' \
                             'sliver[install Sliver C2]' \
-                            'all[apply the complete bundle]'
+                            'p3ta-tricks[install offline pentest knowledge service]' \
+                            'all[apply the complete bundle and specialty components]'
                     elif (( CURRENT >= 3 )); then
                         case $words[2] in
                             apt) _portalgun_apt_packages ;;
@@ -40,7 +41,7 @@ _portalgun() {
                     fi
                     ;;
                 list) _values 'type' 'all' 'apt' 'github' ;;
-                update) _values 'target' 'burp' 'sliver' ;;
+                update) _values 'target' 'burp' 'sliver' 'p3ta-tricks' ;;
                 profile)
                     if (( CURRENT == 2 )); then
                         _values 'profile command' list show create validate apply current verify
@@ -56,8 +57,8 @@ _portalgun() {
 _portalgun_commands() {
     local -a commands
     commands=(
-        'install:install tools or replay the bundle'
-        'update:update installed tools'
+        'install:install tools, services, or replay the bundle'
+        'update:update installed tools or specialty services'
         'import:import operator-specific data such as a Burp license'
         'register:backfill the registry'
         'export:export the current bundle'

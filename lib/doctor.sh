@@ -12,14 +12,15 @@ doctor_run() {
     echo ""
 
     # ─── 1. Registry ─────────────────────────────────────────────────
-    local apt_count github_count
-    apt_count=$(find "$PORTALGUN_REGISTRY/apt"    -name "*.json" 2>/dev/null | wc -l)
+    local apt_count github_count knowledge_count
+    apt_count=$(find "$PORTALGUN_REGISTRY/apt" -name "*.json" 2>/dev/null | wc -l)
     github_count=$(find "$PORTALGUN_REGISTRY/github" -name "*.json" 2>/dev/null | wc -l)
+    knowledge_count=$(find "$PORTALGUN_REGISTRY/knowledge" -name "*.json" 2>/dev/null | wc -l)
     printf "Registry        %s\n" "$PORTALGUN_REGISTRY"
     printf "  apt:          %d tools\n" "$apt_count"
     printf "  github:       %d tools\n" "$github_count"
+    printf "  knowledge:    %d services\n" "$knowledge_count"
 
-    # build_failed entries
     local build_failed
     build_failed=$(grep -l '"status": "build_failed"' "$PORTALGUN_REGISTRY"/github/*.json 2>/dev/null | wc -l)
     if [ "$build_failed" -gt 0 ]; then
@@ -41,15 +42,12 @@ for p in base.rglob("*"):
     if not p.is_dir(): continue
     if "source" in p.relative_to(base).parts: continue
     if (p / "source").is_dir():
-        if any(x.is_file() for x in p.iterdir()):
-            complete += 1
-        else:
-            no_files += 1
+        if any(x.is_file() for x in p.iterdir()): complete += 1
+        else: no_files += 1
     else:
         subs = [x for x in p.iterdir() if x.is_dir() and x.name != "source"]
         files = [x for x in p.iterdir() if x.is_file()]
-        if not subs and not files:
-            empty += 1
+        if not subs and not files: empty += 1
 print(f"  complete:     {complete}")
 print(f"  source only:  {no_files}  (likely reference repos — usually fine)")
 print(f"  empty:        {empty}")
@@ -65,8 +63,7 @@ PYEOF
     printf "PATH symlinks   /usr/local/bin → /opt/tools\n"
     printf "  total:        %d\n" "$sym_count"
 
-    # Check for broken symlinks (target missing)
-    local broken=0
+    local broken=0 target bn
     while read -r sym; do
         target=$(readlink "$sym")
         [ -e "$target" ] || broken=$((broken+1))
@@ -75,7 +72,6 @@ PYEOF
         print_warning "  $broken broken symlinks (target missing)"
     fi
 
-    # Check for shadows of system commands (should be 0)
     local shadows=0
     while read -r sym; do
         bn=$(basename "$sym")
@@ -104,8 +100,6 @@ PYEOF
     else
         printf "  portalgun-firstboot: ${YELLOW}not enabled${NC} — clones won't regenerate identity\n"
     fi
-    # Use sudo for docker — kali isn't in docker group until first logout/login
-    # after master_setup runs `usermod -aG docker`.
     if sudo -n docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^bloodhound-ce-bloodhound-1$"; then
         printf "  bloodhound:          ${GREEN}running${NC} (http://localhost:1338)\n"
     elif curl -s -o /dev/null -w "%{http_code}" http://localhost:1338 2>/dev/null | grep -q "^[0-9]"; then
@@ -113,13 +107,24 @@ PYEOF
     else
         printf "  bloodhound:          ${YELLOW}not running${NC}\n"
     fi
+
+    if systemctl is-enabled portalgun-p3ta-tricks.service >/dev/null 2>&1 &&
+       systemctl is-active portalgun-p3ta-tricks.service >/dev/null 2>&1; then
+        if curl -fsS --max-time 3 http://127.0.0.1:1339/ 2>/dev/null | grep -Eqi 'p3ta[- ]tricks|p3ta_tricks'; then
+            printf "  p3ta-tricks:         ${GREEN}running${NC} (http://localhost:1339)\n"
+        else
+            printf "  p3ta-tricks:         ${YELLOW}active but HTTP unhealthy${NC}\n"
+        fi
+    else
+        printf "  p3ta-tricks:         ${YELLOW}not enabled and active${NC}\n"
+    fi
     echo ""
 
     # ─── 5. Web manifest freshness ───────────────────────────────────
     if [ -f "$PORTALGUN_WEB_DIR/portalgun_tools.json" ]; then
-        local manifest_total
+        local manifest_total registry_total
         manifest_total=$(jq -r '.totals.total' "$PORTALGUN_WEB_DIR/portalgun_tools.json" 2>/dev/null)
-        local registry_total=$((apt_count + github_count))
+        registry_total=$((apt_count + github_count))
         if [ "$manifest_total" != "$registry_total" ]; then
             print_warning "Web manifest reports $manifest_total tools but registry has $registry_total — drift. Re-run any portalgun install to refresh."
         fi
@@ -131,7 +136,7 @@ PYEOF
 
 doctor_fix_shadows() {
     require_root doctor --fix-shadows
-    local removed=0
+    local removed=0 bn
     while read -r sym; do
         bn=$(basename "$sym")
         if [ -e "/usr/bin/$bn" ] || [ -e "/bin/$bn" ] || [ -e "/usr/sbin/$bn" ] || [ -e "/sbin/$bn" ]; then
@@ -144,10 +149,6 @@ doctor_fix_shadows() {
 }
 
 case "${1:-}" in
-    --fix-shadows)
-        doctor_fix_shadows
-        ;;
-    *)
-        doctor_run
-        ;;
+    --fix-shadows) doctor_fix_shadows ;;
+    *) doctor_run ;;
 esac
